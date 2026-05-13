@@ -5,6 +5,9 @@ const nextConfig = {
   basePath: '/cricket-scorer',
   trailingSlash: true,
   images: { unoptimized: true },
+  env: {
+    NEXT_PUBLIC_BASE_PATH: '/cricket-scorer',
+  },
 };
 
 export default nextConfig;

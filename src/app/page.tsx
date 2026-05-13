@@ -162,7 +162,7 @@ export default function HomePage() {
       {/* Footer hint for display screen */}
       <div className="fixed bottom-4 right-4">
         <button
-          onClick={() => window.open('/display', '_blank', 'noopener')}
+          onClick={() => window.open(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/display`, '_blank', 'noopener')}
           className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 text-sm font-medium px-3 py-2 rounded-lg transition-colors shadow-lg"
         >
           <Activity className="w-4 h-4 text-green-400" />

@@ -173,7 +173,7 @@ export default function ScorerPanel() {
                 <BallControls match={match} innings={innings} />
                 <div className="mt-4 flex gap-2">
                   <button
-                    onClick={() => window.open('/display', '_blank', 'noopener,width=1280,height=720')}
+                    onClick={() => window.open(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/display`, '_blank', 'noopener,width=1280,height=720')}
                     className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors border border-slate-700"
                   >
                     <MonitorPlay className="w-4 h-4 text-blue-400" />
@@ -249,7 +249,7 @@ function Header({ match }: { match?: Match }) {
             </span>
           )}
           <button
-            onClick={() => window.open('/display', '_blank', 'noopener')}
+            onClick={() => window.open(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/display`, '_blank', 'noopener')}
             className="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
             title="Open display screen"
           >
