@@ -1,0 +1,327 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Activity, ExternalLink, MonitorPlay,
+  BarChart2, AlignLeft, Play, Trophy
+} from 'lucide-react';
+import useMatchStore from '@/store/matchStore';
+import { Match } from '@/store/types';
+import { getMatchTitle, getTeam, getInnings } from '@/utils/formatting';
+import { calcRunRate, calcRequiredRunRate } from '@/utils/calculations';
+import MatchSetup from './MatchSetup';
+import TossSetup from './TossSetup';
+import InningsSetup from './InningsSetup';
+import BallControls from './BallControls';
+import ScoreCard from './ScoreCard';
+import NewBatsmanModal from './NewBatsmanModal';
+import NewBowlerModal from './NewBowlerModal';
+
+type Tab = 'score' | 'scorecard' | 'commentary';
+
+export default function ScorerPanel() {
+  const router = useRouter();
+  const { matches, activeMatchId, endMatch, updateMatchStatus } = useMatchStore();
+  const [tab, setTab] = useState<Tab>('score');
+  const commentary = useMatchStore(s => s.commentary);
+
+  const match = activeMatchId ? matches[activeMatchId] : null;
+
+  if (!match || match.status === 'setup') {
+    return (
+      <div className="min-h-screen bg-[#070d1a] p-4">
+        <Header />
+        <div className="max-w-5xl mx-auto pt-6">
+          <MatchSetup onComplete={() => {}} />
+        </div>
+      </div>
+    );
+  }
+
+  if (match.status === 'toss') {
+    return (
+      <div className="min-h-screen bg-[#070d1a] p-4">
+        <Header match={match} />
+        <div className="max-w-5xl mx-auto pt-6">
+          <TossSetup match={match} />
+        </div>
+      </div>
+    );
+  }
+
+  if (match.status === 'innings_setup' || match.status === 'innings_break') {
+    const isSecond = match.currentInningsIndex === 1;
+    if (match.status === 'innings_break') {
+      const firstInn = match.innings[0];
+      const secondInn = match.innings[1];
+      return (
+        <div className="min-h-screen bg-[#070d1a] p-4">
+          <Header match={match} />
+          <div className="max-w-5xl mx-auto pt-6">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto">
+              <div className="score-card mb-6 text-center">
+                <h2 className="text-2xl font-bold text-white mb-2">Innings Break</h2>
+                <p className="text-slate-400 mb-4">
+                  {getTeam(match, firstInn.battingTeamId).shortName} scored {firstInn.runs}/{firstInn.wickets}
+                </p>
+                <div className="bg-orange-600/20 border border-orange-600/40 rounded-xl p-4 mb-4">
+                  <div className="text-orange-300 text-sm">Target</div>
+                  <div className="text-4xl font-bold text-white">{firstInn.runs + 1}</div>
+                  <div className="text-slate-400 text-sm">{getTeam(match, secondInn.battingTeamId).shortName} need {firstInn.runs + 1} in {match.maxOvers} overs</div>
+                </div>
+                <button
+                  onClick={() => updateMatchStatus('innings_setup')}
+                  className="btn-primary px-8 py-3 flex items-center gap-2 mx-auto"
+                >
+                  <Play className="w-5 h-5" /> Start 2nd Innings
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="min-h-screen bg-[#070d1a] p-4">
+        <Header match={match} />
+        <div className="max-w-5xl mx-auto pt-6">
+          <InningsSetup match={match} isSecondInnings={isSecond} />
+        </div>
+      </div>
+    );
+  }
+
+  if (match.status === 'finished') {
+    const result = match.result ?? 'Match Finished';
+    return (
+      <div className="min-h-screen bg-[#070d1a] p-4">
+        <Header match={match} />
+        <div className="max-w-5xl mx-auto pt-6">
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-yellow-600/20 rounded-full flex items-center justify-center mx-auto mb-3">
+              <Trophy className="w-8 h-8 text-yellow-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-1">Match Complete</h2>
+            <p className="text-green-400 font-semibold text-lg">{result}</p>
+          </div>
+          <ScoreCard match={match} />
+          <button
+            onClick={() => router.push('/')}
+            className="w-full btn-primary py-3 mt-4"
+          >
+            Back to Matches
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const innings = getInnings(match);
+  if (!innings) return null;
+
+  return (
+    <div className="min-h-screen bg-[#070d1a] flex flex-col">
+      <Header match={match} />
+
+      {/* Modals */}
+      {match.status === 'awaiting_batsman' && innings.wickets < 10 && (
+        <NewBatsmanModal match={match} innings={innings} />
+      )}
+      {match.status === 'awaiting_bowler' && (
+        <NewBowlerModal match={match} innings={innings} />
+      )}
+
+      {/* Score Header */}
+      <div className="bg-[#0f1928] border-b border-[#1e3a5f]">
+        <div className="max-w-5xl mx-auto px-4 py-3">
+          <ScoreHeader match={match} innings={innings} />
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="bg-[#0a1422] border-b border-[#1e3a5f] sticky top-14 z-10">
+        <div className="max-w-5xl mx-auto px-4 flex">
+          {([
+            { key: 'score', label: 'Score', icon: Activity },
+            { key: 'scorecard', label: 'Scorecard', icon: BarChart2 },
+            { key: 'commentary', label: 'Commentary', icon: AlignLeft },
+          ] as const).map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                tab === key
+                  ? 'border-green-500 text-green-400'
+                  : 'border-transparent text-slate-400 hover:text-white'
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-auto">
+        <div className="max-w-5xl mx-auto px-4 py-4">
+          <AnimatePresence mode="wait">
+            {tab === 'score' && (
+              <motion.div key="score" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <BallControls match={match} innings={innings} />
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={() => window.open('/display', '_blank', 'noopener,width=1280,height=720')}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium transition-colors border border-slate-700"
+                  >
+                    <MonitorPlay className="w-4 h-4 text-blue-400" />
+                    Open Display Screen
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm('End this match?')) {
+                        endMatch();
+                        router.push('/');
+                      }
+                    }}
+                    className="flex items-center gap-2 py-2.5 px-4 rounded-lg bg-red-900/40 hover:bg-red-900/60 text-red-400 text-sm font-medium transition-colors border border-red-800/40"
+                  >
+                    <Trophy className="w-4 h-4" />
+                    End Match
+                  </button>
+                </div>
+              </motion.div>
+            )}
+            {tab === 'scorecard' && (
+              <motion.div key="scorecard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <ScoreCard match={match} />
+              </motion.div>
+            )}
+            {tab === 'commentary' && (
+              <motion.div key="commentary" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <div className="space-y-2">
+                  {commentary.length === 0 && <p className="text-slate-500 text-center py-8">No commentary yet</p>}
+                  {commentary.map((c, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="score-card text-sm text-slate-300 leading-relaxed"
+                    >
+                      {c}
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Header({ match }: { match?: Match }) {
+  const router = useRouter();
+  return (
+    <header className="bg-[#0f1928] border-b border-[#1e3a5f] sticky top-0 z-50 h-14">
+      <div className="max-w-5xl mx-auto px-4 h-full flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => router.push('/')}
+            className="text-slate-400 hover:text-white transition-colors"
+          >
+            ←
+          </button>
+          <div className="w-7 h-7 rounded bg-green-600 flex items-center justify-center">
+            <Activity className="w-4 h-4 text-white" />
+          </div>
+          <span className="font-bold text-white text-sm">
+            {match ? getMatchTitle(match) : 'New Match'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {match && (
+            <span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded-full font-bold animate-pulse">
+              LIVE
+            </span>
+          )}
+          <button
+            onClick={() => window.open('/display', '_blank', 'noopener')}
+            className="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            title="Open display screen"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function ScoreHeader({ match, innings }: { match: any; innings: any }) {
+  const battingTeam = getTeam(match, innings.battingTeamId);
+  const isSecond = match.currentInningsIndex === 1;
+  const firstInn = match.innings[0];
+  const runRate = calcRunRate(innings.runs, innings.overs, innings.balls);
+  const rrr = isSecond && innings.targetRuns
+    ? calcRequiredRunRate(innings.targetRuns, innings.runs, (match.maxOvers * 6) - innings.legalBalls)
+    : null;
+  const needed = isSecond && innings.targetRuns ? innings.targetRuns - innings.runs : null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-4 justify-between">
+      <div className="flex items-center gap-4">
+        <div>
+          <div className="text-xs text-slate-400">{battingTeam.shortName}</div>
+          <motion.div
+            key={`${innings.runs}-${innings.wickets}`}
+            className="text-3xl font-black text-white leading-none"
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 0.2 }}
+          >
+            {innings.runs}/{innings.wickets}
+          </motion.div>
+          <div className="text-xs text-slate-400">{innings.overs}.{innings.balls} ov</div>
+        </div>
+        {isSecond && firstInn && (
+          <div className="text-sm text-slate-400">
+            vs <span className="text-white font-semibold">{firstInn.runs}/{firstInn.wickets}</span>
+          </div>
+        )}
+      </div>
+      <div className="flex gap-4 text-sm">
+        {isSecond && needed !== null && (
+          <div className="text-center">
+            <div className="text-slate-400 text-xs">Need</div>
+            <div className="font-bold text-orange-400">{needed} off {(match.maxOvers * 6) - innings.legalBalls}b</div>
+          </div>
+        )}
+        <div className="text-center">
+          <div className="text-slate-400 text-xs">RR</div>
+          <div className="font-bold text-white">{runRate.toFixed(2)}</div>
+        </div>
+        {rrr !== null && (
+          <div className="text-center">
+            <div className="text-slate-400 text-xs">RRR</div>
+            <div className={`font-bold ${rrr > 12 ? 'text-red-400' : rrr > runRate ? 'text-yellow-400' : 'text-green-400'}`}>
+              {rrr.toFixed(2)}
+            </div>
+          </div>
+        )}
+        {match.innings[1] === undefined && (
+          <div className="text-center">
+            <div className="text-slate-400 text-xs">Proj</div>
+            <div className="font-bold text-blue-400">
+              {innings.legalBalls > 0
+                ? Math.round((innings.runs / innings.legalBalls) * (match.maxOvers * 6))
+                : '--'}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
