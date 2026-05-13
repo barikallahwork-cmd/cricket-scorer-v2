@@ -96,6 +96,22 @@ function createBowlingFigure(playerId: string): BowlingFigure {
   return { playerId, overs: 0, balls: 0, maidens: 0, runs: 0, wickets: 0, wides: 0, noBalls: 0 };
 }
 
+function computeResult(teams: [import('./types').Team, import('./types').Team], currentInningsIndex: number, finalInnings: Innings, firstInnings?: Innings): string {
+  if (currentInningsIndex === 1) {
+    const targetChased = finalInnings.targetRuns > 0 && finalInnings.runs >= finalInnings.targetRuns;
+    if (targetChased) {
+      const battingTeam = teams.find(t => t.id === finalInnings.battingTeamId)!;
+      const wicketsLeft = 10 - finalInnings.wickets;
+      return `${battingTeam.name} won by ${wicketsLeft} wicket${wicketsLeft !== 1 ? 's' : ''}`;
+    }
+    const bowlingTeam = teams.find(t => t.id === finalInnings.bowlingTeamId)!;
+    const margin = (firstInnings?.runs ?? 0) - finalInnings.runs;
+    if (margin <= 0) return 'Match Tied';
+    return `${bowlingTeam.name} won by ${margin} run${margin !== 1 ? 's' : ''}`;
+  }
+  return 'Match Complete';
+}
+
 let broadcastChannel: BroadcastChannel | null = null;
 
 function getBroadcastChannel(): BroadcastChannel | null {
@@ -421,6 +437,28 @@ export const useMatchStore = create<Store>()(
               innings.strikerIndex = innings.strikerIndex === 0 ? 1 : 0;
             }
 
+            const overTargetChased = match.currentInningsIndex === 1 && innings.targetRuns > 0 && innings.runs >= innings.targetRuns;
+            if (overTargetChased) {
+              innings.isCompleted = true;
+              const result = computeResult(match.teams, match.currentInningsIndex, innings, match.innings[0]);
+              set(s => ({
+                matches: {
+                  ...s.matches,
+                  [activeMatchId]: {
+                    ...match,
+                    innings: match.innings.map((inn, i) => i === inningsIdx ? innings : inn),
+                    status: 'finished',
+                    result,
+                    updatedAt: Date.now(),
+                  },
+                },
+                commentary: [commentary_text, ...commentary.slice(0, 49)],
+                broadcastVersion: s.broadcastVersion + 1,
+              }));
+              broadcastState(get());
+              return;
+            }
+
             const newStatus: MatchStatus = actuallyOut ? 'awaiting_batsman' : 'awaiting_bowler';
             set(s => ({
               matches: {
@@ -467,13 +505,15 @@ export const useMatchStore = create<Store>()(
         innings.freeHitNext = isNoBall;
 
         const maxBalls = match.maxOvers * 6;
-        const inningsOver = innings.legalBalls >= maxBalls || innings.wickets >= 10;
+        const targetChased = match.currentInningsIndex === 1 && innings.targetRuns > 0 && innings.runs >= innings.targetRuns;
+        const inningsOver = innings.legalBalls >= maxBalls || innings.wickets >= 10 || targetChased;
 
         if (inningsOver) {
           innings.isCompleted = true;
           const isLastInnings = match.currentInningsIndex >= 1;
 
           if (isLastInnings) {
+            const result = computeResult(match.teams, match.currentInningsIndex, innings, match.innings[0]);
             const updatedInnings = match.innings.map((inn, i) => i === inningsIdx ? innings : inn);
             set(s => ({
               matches: {
@@ -482,6 +522,7 @@ export const useMatchStore = create<Store>()(
                   ...match,
                   innings: updatedInnings,
                   status: 'finished',
+                  result,
                   updatedAt: Date.now(),
                 },
               },

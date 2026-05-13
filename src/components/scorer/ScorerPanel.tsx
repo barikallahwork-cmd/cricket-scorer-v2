@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity, ExternalLink, MonitorPlay,
-  BarChart2, AlignLeft, Play, Trophy
+  BarChart2, AlignLeft, Play, Trophy, Download
 } from 'lucide-react';
+import { exportScorecardPDF } from '@/utils/exportScorecard';
 import useMatchStore from '@/store/matchStore';
 import { Match } from '@/store/types';
 import { getMatchTitle, getTeam, getInnings } from '@/utils/formatting';
@@ -107,12 +108,21 @@ export default function ScorerPanel() {
             <p className="text-green-400 font-semibold text-lg">{result}</p>
           </div>
           <ScoreCard match={match} />
-          <button
-            onClick={() => router.push('/')}
-            className="w-full btn-primary py-3 mt-4"
-          >
-            Back to Matches
-          </button>
+          <div className="flex gap-3 mt-4">
+            <button
+              onClick={() => exportScorecardPDF(match)}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-lg bg-blue-700 hover:bg-blue-600 text-white font-medium transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Export PDF
+            </button>
+            <button
+              onClick={() => router.push('/')}
+              className="flex-1 btn-primary py-3"
+            >
+              Back to Matches
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -196,6 +206,15 @@ export default function ScorerPanel() {
             )}
             {tab === 'scorecard' && (
               <motion.div key="scorecard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <div className="flex justify-end mb-3">
+                  <button
+                    onClick={() => exportScorecardPDF(match)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-sm font-medium transition-colors"
+                  >
+                    <Download className="w-4 h-4" />
+                    Export PDF
+                  </button>
+                </div>
                 <ScoreCard match={match} />
               </motion.div>
             )}
