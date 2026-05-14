@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Tournament, TournamentTeam, Fixture, PointsEntry, TournamentFormat } from './tournamentTypes';
+import { Tournament, TournamentTeam, Fixture, PointsEntry, TournamentFormat, Ground, FixtureMode } from './tournamentTypes';
 
 function generateId(): string {
   return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
@@ -12,40 +12,29 @@ function generateRoundRobinFixtures(tournamentId: string, teams: TournamentTeam[
   const fixtures: Fixture[] = [];
   for (let i = 0; i < teams.length; i++) {
     for (let j = i + 1; j < teams.length; j++) {
-      fixtures.push({
-        id: generateId(),
-        tournamentId,
-        team1Id: teams[i].id,
-        team2Id: teams[j].id,
-        date: '', time: '', ground: '',
-        stage: 'League',
-        status: 'scheduled',
-      });
+      fixtures.push({ id: generateId(), tournamentId, team1Id: teams[i].id, team2Id: teams[j].id, date: '', time: '', ground: '', stage: 'League', status: 'scheduled' });
     }
   }
   return fixtures;
 }
 
 function generateKnockoutFixtures(tournamentId: string, teams: TournamentTeam[]): Fixture[] {
+  const firstStage = teams.length <= 2 ? 'Final' : teams.length <= 4 ? 'Semi Final' : teams.length <= 8 ? 'Quarter Final' : 'Round of 16';
   const fixtures: Fixture[] = [];
-  const stages = teams.length <= 2 ? ['Final'] :
-    teams.length <= 4 ? ['Semi Final', 'Final'] :
-    teams.length <= 8 ? ['Quarter Final', 'Semi Final', 'Final'] :
-    ['Round of 16', 'Quarter Final', 'Semi Final', 'Final'];
-
-  // Only generate first round
   for (let i = 0; i < Math.floor(teams.length / 2); i++) {
-    fixtures.push({
-      id: generateId(),
-      tournamentId,
-      team1Id: teams[i * 2].id,
-      team2Id: teams[i * 2 + 1].id,
-      date: '', time: '', ground: '',
-      stage: stages[0],
-      status: 'scheduled',
-    });
+    fixtures.push({ id: generateId(), tournamentId, team1Id: teams[i * 2].id, team2Id: teams[i * 2 + 1].id, date: '', time: '', ground: '', stage: firstStage, status: 'scheduled' });
   }
   return fixtures;
+}
+
+function generateLeagueKnockoutFixtures(tournamentId: string, teams: TournamentTeam[]): Fixture[] {
+  const league = generateRoundRobinFixtures(tournamentId, teams);
+  // Add placeholder knockout slots (TBD teams)
+  const knockoutStages = teams.length <= 4 ? ['Final'] : teams.length <= 6 ? ['Semi Final', 'Final'] : ['Quarter Final', 'Semi Final', 'Final'];
+  const knockout: Fixture[] = knockoutStages.slice(0, 1).map(stage => ({
+    id: generateId(), tournamentId, team1Id: '', team2Id: '', date: '', time: '', ground: '', stage, status: 'scheduled' as const,
+  }));
+  return [...league, ...knockout];
 }
 
 function recalcPoints(teams: TournamentTeam[], fixtures: Fixture[]): PointsEntry[] {
@@ -54,7 +43,7 @@ function recalcPoints(teams: TournamentTeam[], fixtures: Fixture[]): PointsEntry
     map[t.id] = { teamId: t.id, played: 0, won: 0, lost: 0, tied: 0, noResult: 0, points: 0, runsScored: 0, runsConceded: 0, nrr: 0 };
   }
   for (const f of fixtures) {
-    if (f.status !== 'completed' || !f.winnerTeamId) continue;
+    if (f.status !== 'completed' || !f.winnerTeamId || !f.team1Id || !f.team2Id) continue;
     const t1 = map[f.team1Id]; const t2 = map[f.team2Id];
     if (!t1 || !t2) continue;
     t1.played++; t2.played++;
@@ -77,7 +66,12 @@ interface TournamentActions {
   createTournament(data: { name: string; organizer: string; startDate: string; endDate: string; venue: string; format: TournamentFormat; description: string }): string;
   addTeam(tournamentId: string, team: Omit<TournamentTeam, 'id'>): void;
   removeTeam(tournamentId: string, teamId: string): void;
+  addGround(tournamentId: string, ground: Omit<Ground, 'id'>): void;
+  removeGround(tournamentId: string, groundId: string): void;
+  setFixtureMode(tournamentId: string, mode: FixtureMode): void;
   generateFixtures(tournamentId: string): void;
+  addCustomFixture(tournamentId: string, fixture: Omit<Fixture, 'id' | 'tournamentId'>): void;
+  removeFixture(tournamentId: string, fixtureId: string): void;
   updateFixture(tournamentId: string, fixtureId: string, data: Partial<Fixture>): void;
   deleteTournament(id: string): void;
 }
@@ -93,6 +87,8 @@ export const useTournamentStore = create<Store>()(
         const id = generateId();
         const tournament: Tournament = {
           id, ...data,
+          fixtureMode: 'auto',
+          grounds: [],
           teams: [], fixtures: [], pointsTable: [],
           status: 'upcoming',
           createdAt: Date.now(),
@@ -105,8 +101,7 @@ export const useTournamentStore = create<Store>()(
         set(s => {
           const t = s.tournaments[tournamentId];
           if (!t) return s;
-          const newTeam: TournamentTeam = { ...team, id: generateId() };
-          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, teams: [...t.teams, newTeam] } } };
+          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, teams: [...t.teams, { ...team, id: generateId() }] } } };
         });
       },
 
@@ -118,13 +113,59 @@ export const useTournamentStore = create<Store>()(
         });
       },
 
+      addGround(tournamentId, ground) {
+        set(s => {
+          const t = s.tournaments[tournamentId];
+          if (!t) return s;
+          const newGround: Ground = { ...ground, id: generateId() };
+          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, grounds: [...(t.grounds ?? []), newGround] } } };
+        });
+      },
+
+      removeGround(tournamentId, groundId) {
+        set(s => {
+          const t = s.tournaments[tournamentId];
+          if (!t) return s;
+          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, grounds: t.grounds.filter(g => g.id !== groundId) } } };
+        });
+      },
+
+      setFixtureMode(tournamentId, mode) {
+        set(s => {
+          const t = s.tournaments[tournamentId];
+          if (!t) return s;
+          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, fixtureMode: mode } } };
+        });
+      },
+
       generateFixtures(tournamentId) {
         const t = get().tournaments[tournamentId];
         if (!t || t.teams.length < 2) return;
-        const fixtures = t.format === 'knockout' || t.format === 'custom'
-          ? generateKnockoutFixtures(tournamentId, t.teams)
-          : generateRoundRobinFixtures(tournamentId, t.teams);
-        set(s => ({ tournaments: { ...s.tournaments, [tournamentId]: { ...t, fixtures, status: 'ongoing' } } }));
+        let fixtures: Fixture[];
+        if (t.format === 'knockout') fixtures = generateKnockoutFixtures(tournamentId, t.teams);
+        else if (t.format === 'league_knockout') fixtures = generateLeagueKnockoutFixtures(tournamentId, t.teams);
+        else fixtures = generateRoundRobinFixtures(tournamentId, t.teams);
+        set(s => ({ tournaments: { ...s.tournaments, [tournamentId]: { ...t, fixtures, fixtureMode: 'auto', status: 'ongoing' } } }));
+      },
+
+      addCustomFixture(tournamentId, fixture) {
+        set(s => {
+          const t = s.tournaments[tournamentId];
+          if (!t) return s;
+          const newFixture: Fixture = { ...fixture, id: generateId(), tournamentId };
+          const fixtures = [...t.fixtures, newFixture];
+          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, fixtures, status: 'ongoing' } } };
+        });
+      },
+
+      removeFixture(tournamentId, fixtureId) {
+        set(s => {
+          const t = s.tournaments[tournamentId];
+          if (!t) return s;
+          const fixtures = t.fixtures.filter(f => f.id !== fixtureId);
+          const pointsTable = recalcPoints(t.teams, fixtures);
+          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, fixtures, pointsTable } } };
+        });
       },
 
       updateFixture(tournamentId, fixtureId, data) {

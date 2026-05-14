@@ -1,6 +1,13 @@
 export type TournamentFormat = 'league' | 'knockout' | 'round_robin' | 'league_knockout' | 'custom';
 export type TournamentStatus = 'upcoming' | 'ongoing' | 'completed';
 export type FixtureStatus = 'scheduled' | 'live' | 'completed' | 'cancelled';
+export type FixtureMode = 'auto' | 'custom';
+
+export interface Ground {
+  id: string;
+  name: string;
+  location?: string;
+}
 
 export interface TournamentTeam {
   id: string;
@@ -17,6 +24,7 @@ export interface Fixture {
   team2Id: string;
   date: string;
   time: string;
+  groundId?: string;
   ground: string;
   stage: string;
   matchCode?: string;
@@ -52,6 +60,8 @@ export interface Tournament {
   endDate: string;
   venue: string;
   format: TournamentFormat;
+  fixtureMode: FixtureMode;
+  grounds: Ground[];
   teams: TournamentTeam[];
   fixtures: Fixture[];
   pointsTable: PointsEntry[];
