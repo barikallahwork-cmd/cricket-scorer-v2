@@ -17,10 +17,7 @@ export function useFirebaseSync() {
     try {
       const dbRef = ref(db, `matches/${match.matchCode}`);
       set(dbRef, {
-        matches,
-        activeMatchId,
-        commentary,
-        broadcastVersion,
+        payload: JSON.stringify({ matches, activeMatchId, commentary, broadcastVersion }),
         syncedAt: Date.now(),
       }).catch(() => {});
     } catch {}
@@ -36,8 +33,9 @@ export function useFirebaseReceiver(matchCode: string | null) {
       const dbRef = ref(db, `matches/${matchCode}`);
       const handler = onValue(dbRef, (snapshot) => {
         try {
-          const data = snapshot.val();
-          if (!data) return;
+          const raw = snapshot.val();
+          if (!raw?.payload) return;
+          const data = JSON.parse(raw.payload);
           useMatchStore.setState({
             matches: data.matches ?? {},
             activeMatchId: data.activeMatchId ?? null,
