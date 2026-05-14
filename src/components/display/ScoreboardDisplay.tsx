@@ -8,6 +8,7 @@ import { getTeam, getPlayerName, getInnings, getStriker, getNonStriker } from '@
 import { calcStrikeRate, calcEconomy, calcRunRate, calcRequiredRunRate, ballCode, ballColor, oversDisplay } from '@/utils/calculations';
 import { Match, Innings } from '@/store/types';
 import { Activity, Maximize2, Minimize2, Tv } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 function LiveDot() {
   return (
@@ -453,6 +454,28 @@ export default function ScoreboardDisplay() {
 
       {/* Commentary Ticker */}
       <CommentaryTicker commentary={commentary} />
+
+      {/* Match Code + QR Bar */}
+      {match.matchCode && (
+        <div className="bg-[#0a1220] border-t border-[#1e3a5f] px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-white rounded p-1">
+              <QRCodeSVG
+                value={typeof window !== 'undefined' ? `${window.location.origin}${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/watch?code=${match.matchCode}` : match.matchCode}
+                size={36}
+              />
+            </div>
+            <div>
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Scan to watch live</p>
+              <p className="text-green-400 font-mono font-bold text-sm">{match.matchCode}</p>
+            </div>
+          </div>
+          <div className="text-right text-xs text-slate-600">
+            <p>CricScore Pro</p>
+            {match.venue && <p className="text-slate-500">{match.venue}</p>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity, ExternalLink, MonitorPlay,
-  BarChart2, AlignLeft, Play, Trophy, Download
+  BarChart2, AlignLeft, Play, Trophy, Download, QrCode, Copy, Check, X as XIcon
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { exportScorecardPDF } from '@/utils/exportScorecard';
 import useMatchStore from '@/store/matchStore';
 import { Match } from '@/store/types';
@@ -244,6 +245,18 @@ export default function ScorerPanel() {
 
 function Header({ match }: { match?: Match }) {
   const router = useRouter();
+  const [showQR, setShowQR] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const base = typeof window !== 'undefined' ? window.location.origin + (process.env.NEXT_PUBLIC_BASE_PATH ?? '') : '';
+  const shareUrl = match?.matchCode ? `${base}/watch?code=${match.matchCode}` : '';
+
+  function copyLink() {
+    navigator.clipboard?.writeText(shareUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  }
+
   return (
     <header className="bg-[#0f1928] border-b border-[#1e3a5f] sticky top-0 z-50 h-14">
       <div className="max-w-5xl mx-auto px-4 h-full flex items-center justify-between">
@@ -268,16 +281,72 @@ function Header({ match }: { match?: Match }) {
             </span>
           )}
           {match?.matchCode && (
-            <button
-              onClick={() => {
-                navigator.clipboard?.writeText(match.matchCode!).catch(() => {});
-              }}
-              className="text-xs font-mono bg-green-900/50 border border-green-700/50 text-green-400 px-2 py-0.5 rounded-full hover:bg-green-800/60 transition-colors"
-              title="Match code — click to copy"
-            >
-              {match.matchCode}
-            </button>
+            <>
+              <span className="text-xs font-mono bg-green-900/50 border border-green-700/50 text-green-400 px-2 py-0.5 rounded-full">
+                {match.matchCode}
+              </span>
+              <button
+                onClick={() => setShowQR(true)}
+                className="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-green-400 transition-colors"
+                title="Share match / QR code"
+              >
+                <QrCode className="w-4 h-4" />
+              </button>
+            </>
           )}
+
+          {/* QR / Share modal */}
+          <AnimatePresence>
+            {showQR && match?.matchCode && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                onClick={() => setShowQR(false)}
+              >
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.9, opacity: 0 }}
+                  className="bg-[#0f1928] border border-[#1e3a5f] rounded-2xl p-6 w-full max-w-sm"
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold text-white">Share Match</h2>
+                    <button onClick={() => setShowQR(false)} className="text-slate-400 hover:text-white"><XIcon className="w-5 h-5" /></button>
+                  </div>
+
+                  <div className="bg-white rounded-xl p-4 flex justify-center mb-4">
+                    <QRCodeSVG value={shareUrl} size={180} />
+                  </div>
+
+                  <div className="space-y-2 mb-4">
+                    <div className="bg-slate-800 rounded-lg px-3 py-2 flex items-center justify-between">
+                      <span className="text-slate-400 text-xs">Viewer Code</span>
+                      <span className="text-green-400 font-mono font-bold">{match.matchCode}</span>
+                    </div>
+                    <div className="bg-slate-800 rounded-lg px-3 py-2 flex items-center justify-between">
+                      <span className="text-slate-400 text-xs">Scorer Code</span>
+                      <span className="text-blue-400 font-mono font-bold">{match.scorerCode}</span>
+                    </div>
+                    <div className="bg-slate-800 rounded-lg px-3 py-2 flex items-center justify-between">
+                      <span className="text-slate-400 text-xs">Admin Code</span>
+                      <span className="text-amber-400 font-mono font-bold">{match.adminCode}</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={copyLink}
+                    className="w-full flex items-center justify-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold py-3 rounded-xl transition-colors"
+                  >
+                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {copied ? 'Copied!' : 'Copy Viewer Link'}
+                  </button>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <button
             onClick={() => window.open(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/display`, '_blank', 'noopener')}
             className="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"

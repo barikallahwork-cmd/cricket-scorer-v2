@@ -1,12 +1,15 @@
 'use client';
 
+'use client';
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useMatchStore from '@/store/matchStore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Plus, Play, Trash2, Calendar, MapPin, Users, X } from 'lucide-react';
+import { Activity, Plus, Play, Trash2, Calendar, MapPin, Users, X, Globe } from 'lucide-react';
 import { Match } from '@/store/types';
 import { getMatchTitle } from '@/utils/formatting';
+import { resolveCode } from '@/hooks/useFirebaseSync';
 
 function StatusBadge({ status }: { status: Match['status'] }) {
   const configs = {
@@ -32,16 +35,30 @@ export default function HomePage() {
   const matchList = Object.values(matches).sort((a, b) => b.updatedAt - a.updatedAt);
   const [showJoin, setShowJoin] = useState(false);
   const [joinCode, setJoinCode] = useState('');
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState('');
 
   function resumeMatch(id: string) {
     setActiveMatch(id);
     router.push('/scorer');
   }
 
-  function handleJoin() {
+  async function handleJoin() {
     const code = joinCode.trim().toUpperCase();
     if (!code) return;
-    router.push(`/watch?code=${code}`);
+    setJoining(true);
+    setJoinError('');
+    try {
+      const result = await resolveCode(code);
+      if (!result) { setJoinError('Code not found. Check the code and try again.'); return; }
+      const { matchCode, role } = result;
+      if (role === 'viewer') router.push(`/watch?code=${matchCode}`);
+      else router.push(`/watch?code=${matchCode}&role=${role}`);
+    } catch {
+      setJoinError('Connection error. Please try again.');
+    } finally {
+      setJoining(false);
+    }
   }
 
   return (
@@ -59,6 +76,20 @@ export default function HomePage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => router.push('/grounds')}
+              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
+            >
+              <Globe className="w-4 h-4" />
+              Grounds
+            </button>
+            <button
+              onClick={() => router.push('/tournament')}
+              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
+            >
+              <Activity className="w-4 h-4" />
+              Tournament
+            </button>
             <button
               onClick={() => setShowJoin(true)}
               className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
@@ -210,23 +241,25 @@ export default function HomePage() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <p className="text-slate-400 text-sm mb-4">Enter the match code shared by the scorer</p>
+              <p className="text-slate-400 text-sm mb-4">Enter viewer (CRK), scorer (SCR), or admin (ADM) code</p>
               <input
                 autoFocus
                 type="text"
-                placeholder="e.g. CRK82741"
+                placeholder="CRK• SCR• ADM•••••"
                 value={joinCode}
-                onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinError(''); }}
                 onKeyDown={e => e.key === 'Enter' && handleJoin()}
-                className="w-full bg-slate-800 border border-slate-600 text-white font-mono text-lg text-center rounded-xl px-4 py-3 mb-4 focus:outline-none focus:border-green-500 placeholder-slate-500 tracking-widest"
+                className="w-full bg-slate-800 border border-slate-600 text-white font-mono text-lg text-center rounded-xl px-4 py-3 mb-2 focus:outline-none focus:border-green-500 placeholder-slate-500 tracking-widest"
                 maxLength={10}
               />
+              {joinError && <p className="text-red-400 text-xs text-center mb-3">{joinError}</p>}
+              {!joinError && <div className="mb-4" />}
               <button
                 onClick={handleJoin}
-                disabled={!joinCode.trim()}
+                disabled={!joinCode.trim() || joining}
                 className="w-full bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-3 rounded-xl transition-colors"
               >
-                Watch Live
+                {joining ? 'Looking up...' : 'Join'}
               </button>
             </motion.div>
           </motion.div>
