@@ -3,8 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { Activity, MapPin, Wifi, ArrowLeft } from 'lucide-react';
-import { useAllMatches } from '@/hooks/useFirebaseSync';
+import { Activity, MapPin, Wifi, ArrowLeft, Trash2 } from 'lucide-react';
+import { useAllMatches, deleteFirebaseMatch } from '@/hooks/useFirebaseSync';
 import { Match } from '@/store/types';
 import { getMatchTitle } from '@/utils/formatting';
 
@@ -122,9 +122,23 @@ export default function GroundsPage() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   {finishedMatches.map((entry) => (
                     <div key={entry.matchCode} className="bg-[#0f1928] border border-[#1e3a5f] rounded-xl p-4 opacity-60">
-                      <h3 className="font-semibold text-white mb-1">{getMatchTitle(entry.match)}</h3>
-                      {entry.match.result && <p className="text-green-400 text-sm">{entry.match.result}</p>}
-                      <p className="text-xs text-slate-600 mt-1 font-mono">{entry.matchCode}</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-white mb-1">{getMatchTitle(entry.match)}</h3>
+                          {entry.match.result && <p className="text-green-400 text-sm">{entry.match.result}</p>}
+                          <p className="text-xs text-slate-600 mt-1 font-mono">{entry.matchCode}</p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            if (confirm('Delete this match from the live feed?')) {
+                              await deleteFirebaseMatch(entry.matchCode);
+                            }
+                          }}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-red-900/50 text-slate-500 hover:text-red-400 transition-colors shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

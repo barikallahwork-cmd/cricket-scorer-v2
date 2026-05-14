@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { ref, set, get, onValue, off } from 'firebase/database';
+import { ref, set, get, remove, onValue, off } from 'firebase/database';
 import { getFirebaseDB } from '@/lib/firebase';
 import useMatchStore from '@/store/matchStore';
 
@@ -77,6 +77,15 @@ export async function resolveCode(
   } catch {
     return null;
   }
+}
+
+// Delete a match from Firebase by matchCode
+export async function deleteFirebaseMatch(matchCode: string): Promise<void> {
+  const db = getFirebaseDB();
+  if (!db) return;
+  try {
+    await remove(ref(db, `matches/${matchCode}`));
+  } catch {}
 }
 
 // Subscribe to all active matches (used by grounds dashboard)
