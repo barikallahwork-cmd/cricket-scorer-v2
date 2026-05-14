@@ -37,6 +37,10 @@ interface MatchActions {
     date: string;
     team1: Team;
     team2: Team;
+    tournamentId?: string;
+    fixtureId?: string;
+    tournamentTeam1Id?: string;
+    tournamentTeam2Id?: string;
   }): string;
   setActiveMatch(id: string): void;
   deleteMatch(id: string): void;
@@ -141,7 +145,7 @@ export const useMatchStore = create<Store>()(
       commentary: [],
       broadcastVersion: 0,
 
-      createMatch({ format, maxOvers, venue, date, team1, team2 }) {
+      createMatch({ format, maxOvers, venue, date, team1, team2, tournamentId, fixtureId, tournamentTeam1Id, tournamentTeam2Id }) {
         const id = generateId();
         const matchCode = 'CRK' + Math.floor(10000 + Math.random() * 90000).toString();
         const scorerCode = 'SCR' + Math.floor(1000 + Math.random() * 9000).toString();
@@ -164,10 +168,15 @@ export const useMatchStore = create<Store>()(
           matchCode,
           scorerCode,
           adminCode,
+          tournamentId,
+          fixtureId,
+          tournamentTeam1Id,
+          tournamentTeam2Id,
         };
         set(s => ({
           matches: { ...s.matches, [id]: match },
           activeMatchId: id,
+          broadcastVersion: s.broadcastVersion + 1,
         }));
         broadcastState(get());
         return id;
@@ -210,6 +219,7 @@ export const useMatchStore = create<Store>()(
               updatedAt: Date.now(),
             },
           },
+          broadcastVersion: s.broadcastVersion + 1,
         }));
         broadcastState(get());
       },
@@ -256,6 +266,7 @@ export const useMatchStore = create<Store>()(
               updatedAt: Date.now(),
             },
           },
+          broadcastVersion: s.broadcastVersion + 1,
         }));
         broadcastState(get());
       },
@@ -618,6 +629,7 @@ export const useMatchStore = create<Store>()(
               updatedAt: Date.now(),
             },
           },
+          broadcastVersion: s.broadcastVersion + 1,
         }));
         broadcastState(get());
       },
@@ -645,6 +657,7 @@ export const useMatchStore = create<Store>()(
               updatedAt: Date.now(),
             },
           },
+          broadcastVersion: s.broadcastVersion + 1,
         }));
         broadcastState(get());
       },
@@ -663,6 +676,7 @@ export const useMatchStore = create<Store>()(
               updatedAt: Date.now(),
             },
           },
+          broadcastVersion: s.broadcastVersion + 1,
         }));
         broadcastState(get());
       },

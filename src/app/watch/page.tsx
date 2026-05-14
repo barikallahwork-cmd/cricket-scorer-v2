@@ -54,8 +54,9 @@ export default function WatchPage() {
   }, []);
 
   useFirebaseReceiver(matchCode);
-  // Scorer and admin can push changes back to Firebase
-  useFirebaseSync();
+  // Only push to Firebase after connected and only for non-viewer roles.
+  // Prevents stale localStorage from overwriting live scorer state on join.
+  useFirebaseSync(connected && role !== 'viewer');
 
   useEffect(() => {
     if (!matchCode || !ready) return;

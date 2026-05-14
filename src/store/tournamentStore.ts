@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Tournament, TournamentTeam, Fixture, PointsEntry, TournamentFormat, Ground, FixtureMode } from './tournamentTypes';
+import { Tournament, TournamentTeam, Fixture, PointsEntry, TournamentFormat, Ground, FixtureMode, ManagedTeam } from './tournamentTypes';
 
 function generateId(): string {
   return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
@@ -29,7 +29,6 @@ function generateKnockoutFixtures(tournamentId: string, teams: TournamentTeam[])
 
 function generateLeagueKnockoutFixtures(tournamentId: string, teams: TournamentTeam[]): Fixture[] {
   const league = generateRoundRobinFixtures(tournamentId, teams);
-  // Add placeholder knockout slots (TBD teams)
   const knockoutStages = teams.length <= 4 ? ['Final'] : teams.length <= 6 ? ['Semi Final', 'Final'] : ['Quarter Final', 'Semi Final', 'Final'];
   const knockout: Fixture[] = knockoutStages.slice(0, 1).map(stage => ({
     id: generateId(), tournamentId, team1Id: '', team2Id: '', date: '', time: '', ground: '', stage, status: 'scheduled' as const,
@@ -61,9 +60,10 @@ function recalcPoints(teams: TournamentTeam[], fixtures: Fixture[]): PointsEntry
 
 interface TournamentState {
   tournaments: Record<string, Tournament>;
+  managedTeams: ManagedTeam[];
 }
 interface TournamentActions {
-  createTournament(data: { name: string; organizer: string; startDate: string; endDate: string; venue: string; format: TournamentFormat; description: string }): string;
+  createTournament(data: { name: string; organizer: string; startDate: string; endDate: string; venue: string; format: TournamentFormat; description: string; oversPerInnings?: number }): string;
   addTeam(tournamentId: string, team: Omit<TournamentTeam, 'id'>): void;
   removeTeam(tournamentId: string, teamId: string): void;
   addGround(tournamentId: string, ground: Omit<Ground, 'id'>): void;
@@ -74,6 +74,10 @@ interface TournamentActions {
   removeFixture(tournamentId: string, fixtureId: string): void;
   updateFixture(tournamentId: string, fixtureId: string, data: Partial<Fixture>): void;
   deleteTournament(id: string): void;
+  // Managed teams
+  createManagedTeam(team: Omit<ManagedTeam, 'id'>): string;
+  updateManagedTeam(id: string, data: Partial<Omit<ManagedTeam, 'id'>>): void;
+  deleteManagedTeam(id: string): void;
 }
 
 type Store = TournamentState & TournamentActions;
@@ -82,11 +86,13 @@ export const useTournamentStore = create<Store>()(
   persist(
     (set, get) => ({
       tournaments: {},
+      managedTeams: [],
 
       createTournament(data) {
         const id = generateId();
         const tournament: Tournament = {
           id, ...data,
+          oversPerInnings: data.oversPerInnings ?? 20,
           fixtureMode: 'auto',
           grounds: [],
           teams: [], fixtures: [], pointsTable: [],
@@ -180,6 +186,21 @@ export const useTournamentStore = create<Store>()(
 
       deleteTournament(id) {
         set(s => { const { [id]: _, ...rest } = s.tournaments; return { tournaments: rest }; });
+      },
+
+      createManagedTeam(team) {
+        const id = generateId();
+        const newTeam: ManagedTeam = { ...team, id };
+        set(s => ({ managedTeams: [...s.managedTeams, newTeam] }));
+        return id;
+      },
+
+      updateManagedTeam(id, data) {
+        set(s => ({ managedTeams: s.managedTeams.map(t => t.id === id ? { ...t, ...data } : t) }));
+      },
+
+      deleteManagedTeam(id) {
+        set(s => ({ managedTeams: s.managedTeams.filter(t => t.id !== id) }));
       },
     }),
     { name: 'cricket-tournament-v1', storage: createJSONStorage(() => typeof window !== 'undefined' ? localStorage : { getItem: () => null, setItem: () => {}, removeItem: () => {} }) }

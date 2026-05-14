@@ -9,12 +9,23 @@ export interface Ground {
   location?: string;
 }
 
+export interface ManagedTeam {
+  id: string;
+  name: string;
+  shortName: string;
+  color: string;
+  captainName: string;
+  players: string[]; // 11 player names
+}
+
 export interface TournamentTeam {
   id: string;
   name: string;
   shortName: string;
   color: string;
   captainName: string;
+  players?: string[];
+  managedTeamId?: string;
 }
 
 export interface Fixture {
@@ -68,4 +79,5 @@ export interface Tournament {
   description: string;
   status: TournamentStatus;
   createdAt: number;
+  oversPerInnings: number;
 }

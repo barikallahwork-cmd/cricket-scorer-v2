@@ -6,6 +6,7 @@ import useMatchStore from '@/store/matchStore';
 import ScorerPanel from '@/components/scorer/ScorerPanel';
 import MatchSetup from '@/components/scorer/MatchSetup';
 import { useFirebaseSync } from '@/hooks/useFirebaseSync';
+import { useTournamentSync } from '@/hooks/useTournamentSync';
 
 export default function ScorerPage() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function ScorerPage() {
   const [showSetup, setShowSetup] = useState(false);
   const [ready, setReady] = useState(false);
   useFirebaseSync();
+  useTournamentSync();
 
   useEffect(() => {
     // Read URL params client-side — avoids useSearchParams static export issue

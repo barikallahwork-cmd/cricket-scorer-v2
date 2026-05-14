@@ -162,4 +162,8 @@ export interface Match {
     target: number;
     overs: number;
   };
+  tournamentId?: string;
+  fixtureId?: string;
+  tournamentTeam1Id?: string;
+  tournamentTeam2Id?: string;
 }

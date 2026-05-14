@@ -5,10 +5,11 @@ import { ref, set, get, onValue, off } from 'firebase/database';
 import { getFirebaseDB } from '@/lib/firebase';
 import useMatchStore from '@/store/matchStore';
 
-export function useFirebaseSync() {
+export function useFirebaseSync(enabled = true) {
   const { matches, activeMatchId, commentary, broadcastVersion } = useMatchStore();
 
   useEffect(() => {
+    if (!enabled) return;
     const db = getFirebaseDB();
     if (!db || !activeMatchId) return;
     const match = matches[activeMatchId];
@@ -29,7 +30,7 @@ export function useFirebaseSync() {
         set(ref(db, `codes/${match.adminCode}`), match.matchCode).catch(() => {});
       }
     } catch {}
-  }, [broadcastVersion, activeMatchId]);
+  }, [broadcastVersion, activeMatchId, enabled]);
 }
 
 export function useFirebaseReceiver(matchCode: string | null) {

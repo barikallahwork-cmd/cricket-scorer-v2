@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Plus, ArrowLeft, Users, Calendar, Trash2, Play, BarChart2, List, ChevronRight, MapPin, Zap, PenLine } from 'lucide-react';
+import { Trophy, Plus, ArrowLeft, Users, Calendar, Trash2, Play, BarChart2, List, ChevronRight, MapPin, Zap, PenLine, UserCircle2, Star } from 'lucide-react';
 import useTournamentStore from '@/store/tournamentStore';
-import { Tournament, TournamentTeam, Fixture, TournamentFormat, Ground } from '@/store/tournamentTypes';
+import { Tournament, TournamentTeam, Fixture, TournamentFormat, Ground, ManagedTeam } from '@/store/tournamentTypes';
 
 const COLORS = ['#ef4444','#3b82f6','#22c55e','#f59e0b','#8b5cf6','#ec4899','#06b6d4','#f97316'];
 const FORMATS: { label: string; value: TournamentFormat }[] = [
@@ -17,13 +17,16 @@ const FORMATS: { label: string; value: TournamentFormat }[] = [
 ];
 const STAGE_PRESETS = ['League', 'Group Stage', 'Quarter Final', 'Semi Final', 'Final', 'Plate Final', 'Custom'];
 
-type View = 'list' | 'create' | 'detail';
+type View = 'list' | 'create' | 'detail' | 'teams_library';
 type DetailTab = 'overview' | 'teams' | 'fixtures' | 'points' | 'grounds';
+
+// ——— Helpers ———
+const cls = (base: string) => `${base} bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 focus:outline-none focus:border-green-500 placeholder-slate-500 text-sm`;
 
 // ——— Create Tournament Form ———
 function CreateForm({ onDone }: { onDone: () => void }) {
   const { createTournament } = useTournamentStore();
-  const [form, setForm] = useState({ name: '', organizer: '', startDate: '', endDate: '', venue: '', format: 'league' as TournamentFormat, description: '' });
+  const [form, setForm] = useState({ name: '', organizer: '', startDate: '', endDate: '', venue: '', format: 'league' as TournamentFormat, description: '', oversPerInnings: 20 });
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
@@ -31,23 +34,28 @@ function CreateForm({ onDone }: { onDone: () => void }) {
     onDone();
   }
   const f = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setForm(p => ({ ...p, [k]: e.target.value }));
-  const cls = 'w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 focus:outline-none focus:border-green-500 placeholder-slate-500';
+  const inputCls = 'w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-2.5 focus:outline-none focus:border-green-500 placeholder-slate-500';
   return (
     <form onSubmit={submit} className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div><label className="text-xs text-slate-400 mb-1 block">Tournament Name *</label><input required className={cls} placeholder="Premier League 2026" value={form.name} onChange={f('name')} /></div>
-        <div><label className="text-xs text-slate-400 mb-1 block">Organizer</label><input className={cls} placeholder="Cricket Club" value={form.organizer} onChange={f('organizer')} /></div>
-        <div><label className="text-xs text-slate-400 mb-1 block">Start Date</label><input type="date" className={cls} value={form.startDate} onChange={f('startDate')} /></div>
-        <div><label className="text-xs text-slate-400 mb-1 block">End Date</label><input type="date" className={cls} value={form.endDate} onChange={f('endDate')} /></div>
-        <div><label className="text-xs text-slate-400 mb-1 block">Venue</label><input className={cls} placeholder="Main Ground" value={form.venue} onChange={f('venue')} /></div>
+        <div><label className="text-xs text-slate-400 mb-1 block">Tournament Name *</label><input required className={inputCls} placeholder="Premier League 2026" value={form.name} onChange={f('name')} /></div>
+        <div><label className="text-xs text-slate-400 mb-1 block">Organizer</label><input className={inputCls} placeholder="Cricket Club" value={form.organizer} onChange={f('organizer')} /></div>
+        <div><label className="text-xs text-slate-400 mb-1 block">Start Date</label><input type="date" className={inputCls} value={form.startDate} onChange={f('startDate')} /></div>
+        <div><label className="text-xs text-slate-400 mb-1 block">End Date</label><input type="date" className={inputCls} value={form.endDate} onChange={f('endDate')} /></div>
+        <div><label className="text-xs text-slate-400 mb-1 block">Venue</label><input className={inputCls} placeholder="Main Ground" value={form.venue} onChange={f('venue')} /></div>
         <div>
           <label className="text-xs text-slate-400 mb-1 block">Format</label>
-          <select className={cls} value={form.format} onChange={f('format')}>
+          <select className={inputCls} value={form.format} onChange={f('format')}>
             {FORMATS.map(fmt => <option key={fmt.value} value={fmt.value}>{fmt.label}</option>)}
           </select>
         </div>
+        <div>
+          <label className="text-xs text-slate-400 mb-1 block">Overs per Innings</label>
+          <input type="number" min={1} max={200} className={inputCls} value={form.oversPerInnings}
+            onChange={e => setForm(p => ({ ...p, oversPerInnings: parseInt(e.target.value) || 20 }))} />
+        </div>
       </div>
-      <div><label className="text-xs text-slate-400 mb-1 block">Description</label><textarea className={cls} rows={2} placeholder="Optional description..." value={form.description} onChange={f('description')} /></div>
+      <div><label className="text-xs text-slate-400 mb-1 block">Description</label><textarea className={inputCls} rows={2} placeholder="Optional description..." value={form.description} onChange={f('description')} /></div>
       <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-semibold py-3 rounded-xl transition-colors">Create Tournament</button>
     </form>
   );
@@ -55,30 +63,80 @@ function CreateForm({ onDone }: { onDone: () => void }) {
 
 // ——— Add Team Form ———
 function AddTeamForm({ tournamentId, onDone }: { tournamentId: string; onDone: () => void }) {
-  const { addTeam } = useTournamentStore();
-  const [form, setForm] = useState({ name: '', shortName: '', captainName: '', color: COLORS[0] });
-  function submit(e: React.FormEvent) {
+  const { addTeam, managedTeams } = useTournamentStore();
+  const [mode, setMode] = useState<'new' | 'library'>('new');
+  const [form, setForm] = useState({ name: '', shortName: '', captainName: '', color: COLORS[0], players: Array(11).fill('') as string[] });
+
+  function submitNew(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim()) return;
-    addTeam(tournamentId, form);
-    setForm({ name: '', shortName: '', captainName: '', color: COLORS[Math.floor(Math.random() * COLORS.length)] });
+    addTeam(tournamentId, { ...form, players: form.players.filter(p => p.trim()) });
+    setForm({ name: '', shortName: '', captainName: '', color: COLORS[Math.floor(Math.random() * COLORS.length)], players: Array(11).fill('') });
     onDone();
   }
-  const cls = 'bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 focus:outline-none focus:border-green-500 placeholder-slate-500 text-sm';
+
+  function addFromLibrary(mt: ManagedTeam) {
+    addTeam(tournamentId, { name: mt.name, shortName: mt.shortName, captainName: mt.captainName, color: mt.color, players: mt.players, managedTeamId: mt.id });
+    onDone();
+  }
+
+  if (mode === 'library') {
+    return (
+      <div className="bg-slate-800/40 rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-white">Add from Teams Library</h3>
+          <button onClick={() => setMode('new')} className="text-xs text-slate-400 hover:text-white">+ New Team Instead</button>
+        </div>
+        {managedTeams.length === 0 ? (
+          <p className="text-slate-500 text-sm">No teams in library yet. Create teams in the Teams Library.</p>
+        ) : (
+          <div className="space-y-2">
+            {managedTeams.map(mt => (
+              <button key={mt.id} onClick={() => addFromLibrary(mt)} className="w-full flex items-center justify-between bg-slate-800 hover:bg-slate-700 rounded-xl p-3 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: mt.color }}>{mt.shortName?.[0] || mt.name[0]}</div>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-white">{mt.name}</p>
+                    <p className="text-xs text-slate-500">{mt.players.filter(p => p).length} players</p>
+                  </div>
+                </div>
+                <Plus className="w-4 h-4 text-green-400" />
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <form onSubmit={submit} className="bg-slate-800/40 rounded-xl p-4 space-y-3">
-      <h3 className="text-sm font-semibold text-white">Add Team</h3>
+    <form onSubmit={submitNew} className="bg-slate-800/40 rounded-xl p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-white">Add New Team</h3>
+        {managedTeams.length > 0 && (
+          <button type="button" onClick={() => setMode('library')} className="text-xs text-yellow-400 hover:text-yellow-300">From Library</button>
+        )}
+      </div>
       <div className="grid grid-cols-2 gap-2">
-        <input required className={cls} placeholder="Team Name *" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
-        <input className={cls} placeholder="Short (e.g. CSK)" maxLength={4} value={form.shortName} onChange={e => setForm(p => ({ ...p, shortName: e.target.value.toUpperCase() }))} />
-        <input className={cls} placeholder="Captain Name" value={form.captainName} onChange={e => setForm(p => ({ ...p, captainName: e.target.value }))} />
+        <input required className={cls('w-full')} placeholder="Team Name *" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+        <input className={cls('w-full')} placeholder="Short (e.g. CSK)" maxLength={4} value={form.shortName} onChange={e => setForm(p => ({ ...p, shortName: e.target.value.toUpperCase() }))} />
+        <input className={cls('w-full')} placeholder="Captain Name" value={form.captainName} onChange={e => setForm(p => ({ ...p, captainName: e.target.value }))} />
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-400">Color</span>
-          <div className="flex gap-1 flex-wrap">
+          <div className="flex gap-1">
             {COLORS.slice(0, 5).map(c => (
               <button type="button" key={c} onClick={() => setForm(p => ({ ...p, color: c }))} className={`w-5 h-5 rounded-full border-2 ${form.color === c ? 'border-white' : 'border-transparent'}`} style={{ background: c }} />
             ))}
           </div>
+        </div>
+      </div>
+      <div>
+        <label className="text-xs text-slate-400 mb-1 block">Player Names (optional)</label>
+        <div className="grid grid-cols-2 gap-1.5">
+          {form.players.map((name, i) => (
+            <input key={i} className={cls('w-full')} placeholder={`Player ${i + 1}`} value={name}
+              onChange={e => setForm(p => { const players = [...p.players]; players[i] = e.target.value; return { ...p, players }; })} />
+          ))}
         </div>
       </div>
       <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 rounded-xl text-sm transition-colors">Add Team</button>
@@ -97,13 +155,12 @@ function AddGroundForm({ tournamentId, onDone }: { tournamentId: string; onDone:
     setForm({ name: '', location: '' });
     onDone();
   }
-  const cls = 'bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 focus:outline-none focus:border-green-500 placeholder-slate-500 text-sm';
   return (
     <form onSubmit={submit} className="bg-slate-800/40 rounded-xl p-4 space-y-3">
       <h3 className="text-sm font-semibold text-white">Add Ground</h3>
       <div className="grid grid-cols-2 gap-2">
-        <input required className={cls} placeholder="Ground Name *" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
-        <input className={cls} placeholder="Location (optional)" value={form.location} onChange={e => setForm(p => ({ ...p, location: e.target.value }))} />
+        <input required className={cls('w-full')} placeholder="Ground Name *" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+        <input className={cls('w-full')} placeholder="Location (optional)" value={form.location} onChange={e => setForm(p => ({ ...p, location: e.target.value }))} />
       </div>
       <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-semibold py-2 rounded-xl text-sm transition-colors">Add Ground</button>
     </form>
@@ -113,35 +170,16 @@ function AddGroundForm({ tournamentId, onDone }: { tournamentId: string; onDone:
 // ——— Add Custom Fixture Form ———
 function AddCustomFixtureForm({ tournament, onDone }: { tournament: Tournament; onDone: () => void }) {
   const { addCustomFixture } = useTournamentStore();
-  const [form, setForm] = useState({
-    team1Id: tournament.teams[0]?.id ?? '',
-    team2Id: tournament.teams[1]?.id ?? '',
-    stage: 'League',
-    customStage: '',
-    date: '',
-    time: '',
-    groundId: '',
-  });
+  const [form, setForm] = useState({ team1Id: tournament.teams[0]?.id ?? '', team2Id: tournament.teams[1]?.id ?? '', stage: 'League', customStage: '', date: '', time: '', groundId: '' });
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.team1Id || !form.team2Id || form.team1Id === form.team2Id) return;
     const stage = form.stage === 'Custom' ? (form.customStage.trim() || 'Custom') : form.stage;
     const ground = tournament.grounds.find(g => g.id === form.groundId);
-    addCustomFixture(tournament.id, {
-      team1Id: form.team1Id,
-      team2Id: form.team2Id,
-      stage,
-      date: form.date,
-      time: form.time,
-      groundId: form.groundId || undefined,
-      ground: ground?.name ?? '',
-      status: 'scheduled',
-    });
+    addCustomFixture(tournament.id, { team1Id: form.team1Id, team2Id: form.team2Id, stage, date: form.date, time: form.time, groundId: form.groundId || undefined, ground: ground?.name ?? '', status: 'scheduled' });
     onDone();
   }
-
-  const cls = 'w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-3 py-2 focus:outline-none focus:border-green-500 text-sm';
 
   return (
     <form onSubmit={submit} className="bg-slate-800/40 rounded-xl p-4 space-y-3">
@@ -149,13 +187,13 @@ function AddCustomFixtureForm({ tournament, onDone }: { tournament: Tournament; 
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-xs text-slate-400 mb-1 block">Team 1 *</label>
-          <select className={cls} value={form.team1Id} onChange={e => setForm(p => ({ ...p, team1Id: e.target.value }))}>
+          <select className={cls('w-full')} value={form.team1Id} onChange={e => setForm(p => ({ ...p, team1Id: e.target.value }))}>
             {tournament.teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </div>
         <div>
           <label className="text-xs text-slate-400 mb-1 block">Team 2 *</label>
-          <select className={cls} value={form.team2Id} onChange={e => setForm(p => ({ ...p, team2Id: e.target.value }))}>
+          <select className={cls('w-full')} value={form.team2Id} onChange={e => setForm(p => ({ ...p, team2Id: e.target.value }))}>
             {tournament.teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </div>
@@ -163,33 +201,28 @@ function AddCustomFixtureForm({ tournament, onDone }: { tournament: Tournament; 
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-xs text-slate-400 mb-1 block">Stage</label>
-          <select className={cls} value={form.stage} onChange={e => setForm(p => ({ ...p, stage: e.target.value }))}>
+          <select className={cls('w-full')} value={form.stage} onChange={e => setForm(p => ({ ...p, stage: e.target.value }))}>
             {STAGE_PRESETS.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         {form.stage === 'Custom' && (
           <div>
             <label className="text-xs text-slate-400 mb-1 block">Stage Name</label>
-            <input className={cls} placeholder="e.g. Round of 16" value={form.customStage} onChange={e => setForm(p => ({ ...p, customStage: e.target.value }))} />
+            <input className={cls('w-full')} placeholder="e.g. Round of 16" value={form.customStage} onChange={e => setForm(p => ({ ...p, customStage: e.target.value }))} />
           </div>
         )}
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <input type="date" className={cls} value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
-        <input type="time" className={cls} value={form.time} onChange={e => setForm(p => ({ ...p, time: e.target.value }))} />
+        <input type="date" className={cls('w-full')} value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
+        <input type="time" className={cls('w-full')} value={form.time} onChange={e => setForm(p => ({ ...p, time: e.target.value }))} />
       </div>
       {tournament.grounds.length > 0 && (
-        <div>
-          <label className="text-xs text-slate-400 mb-1 block">Ground</label>
-          <select className={cls} value={form.groundId} onChange={e => setForm(p => ({ ...p, groundId: e.target.value }))}>
-            <option value="">No ground selected</option>
-            {tournament.grounds.map(g => <option key={g.id} value={g.id}>{g.name}{g.location ? ` — ${g.location}` : ''}</option>)}
-          </select>
-        </div>
+        <select className={cls('w-full')} value={form.groundId} onChange={e => setForm(p => ({ ...p, groundId: e.target.value }))}>
+          <option value="">No ground selected</option>
+          {tournament.grounds.map(g => <option key={g.id} value={g.id}>{g.name}{g.location ? ` — ${g.location}` : ''}</option>)}
+        </select>
       )}
-      {form.team1Id === form.team2Id && form.team1Id && (
-        <p className="text-xs text-red-400">Team 1 and Team 2 must be different.</p>
-      )}
+      {form.team1Id === form.team2Id && form.team1Id && <p className="text-xs text-red-400">Teams must be different.</p>}
       <button type="submit" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 rounded-xl text-sm transition-colors">Add Fixture</button>
     </form>
   );
@@ -200,37 +233,26 @@ function FixtureCard({ fixture, teams, grounds, onUpdate, onDelete }: { fixture:
   const t1 = teams.find(t => t.id === fixture.team1Id);
   const t2 = teams.find(t => t.id === fixture.team2Id);
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({
-    date: fixture.date,
-    time: fixture.time,
-    ground: fixture.ground,
-    groundId: fixture.groundId ?? '',
-    matchCode: fixture.matchCode ?? '',
-    winnerTeamId: fixture.winnerTeamId ?? '',
-    team1Runs: fixture.team1Runs ?? '' as number | string,
-    team2Runs: fixture.team2Runs ?? '' as number | string,
-  });
+  const [form, setForm] = useState({ date: fixture.date, time: fixture.time, ground: fixture.ground, groundId: fixture.groundId ?? '', matchCode: fixture.matchCode ?? '', winnerTeamId: fixture.winnerTeamId ?? '', team1Runs: fixture.team1Runs ?? '' as number | string, team2Runs: fixture.team2Runs ?? '' as number | string });
 
   if (!t1 && !t2) return null;
 
   function save() {
-    const isCompleted = !!form.winnerTeamId;
     const selectedGround = grounds?.find(g => g.id === form.groundId);
     onUpdate({
-      date: form.date,
-      time: form.time,
+      date: form.date, time: form.time,
       groundId: form.groundId || undefined,
       ground: selectedGround ? selectedGround.name : (form.ground as string),
       matchCode: form.matchCode || undefined,
       winnerTeamId: form.winnerTeamId || undefined,
       team1Runs: form.team1Runs !== '' ? Number(form.team1Runs) : undefined,
       team2Runs: form.team2Runs !== '' ? Number(form.team2Runs) : undefined,
-      status: isCompleted ? 'completed' : 'scheduled',
+      status: form.winnerTeamId ? 'completed' : 'scheduled',
     });
     setEditing(false);
   }
 
-  const statusCls: Record<string, string> = { scheduled: 'bg-slate-700 text-slate-300', live: 'bg-red-600 text-white', completed: 'bg-green-800 text-green-300', cancelled: 'bg-slate-800 text-slate-500' };
+  const statusCls: Record<string, string> = { scheduled: 'bg-slate-700 text-slate-300', live: 'bg-red-600 text-white animate-pulse', completed: 'bg-green-800 text-green-300', cancelled: 'bg-slate-800 text-slate-500' };
   const winner = form.winnerTeamId ? teams.find(t => t.id === form.winnerTeamId) : null;
   const groundName = grounds?.find(g => g.id === fixture.groundId)?.name || fixture.ground;
 
@@ -240,8 +262,8 @@ function FixtureCard({ fixture, teams, grounds, onUpdate, onDelete }: { fixture:
         <span className="text-xs text-slate-500">{fixture.stage}</span>
         <div className="flex items-center gap-2">
           <span className={`text-xs px-2 py-0.5 rounded-full ${statusCls[fixture.status] ?? statusCls.scheduled}`}>{fixture.status}</span>
-          {onDelete && (
-            <button onClick={onDelete} className="text-slate-600 hover:text-red-400 transition-colors">
+          {onDelete && fixture.status !== 'completed' && (
+            <button onClick={onDelete} className="text-slate-600 hover:text-red-400 transition-colors" title="Delete fixture">
               <Trash2 className="w-3 h-3" />
             </button>
           )}
@@ -258,12 +280,12 @@ function FixtureCard({ fixture, teams, grounds, onUpdate, onDelete }: { fixture:
           {t2 && <div className="w-3 h-3 rounded-full" style={{ background: t2.color }} />}
         </div>
       </div>
-      {fixture.status === 'completed' && winner && (
-        <p className="text-green-400 text-xs mb-2">{winner.name} won</p>
+      {fixture.status === 'completed' && (
+        <p className="text-green-400 text-xs mb-2">
+          {winner ? `${winner.name} won` : fixture.result || 'Completed'}
+        </p>
       )}
-      {(fixture.date || groundName) && (
-        <p className="text-xs text-slate-500 mb-2">{fixture.date} {fixture.time} {groundName && `• ${groundName}`}</p>
-      )}
+      {(fixture.date || groundName) && <p className="text-xs text-slate-500 mb-2">{fixture.date} {fixture.time} {groundName && `• ${groundName}`}</p>}
       {fixture.matchCode && <p className="text-xs font-mono text-slate-600 mb-2">{fixture.matchCode}</p>}
 
       {editing ? (
@@ -282,8 +304,8 @@ function FixtureCard({ fixture, teams, grounds, onUpdate, onDelete }: { fixture:
           )}
           <input className="w-full bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none font-mono" placeholder="Match Code (CRK...)" value={form.matchCode} onChange={e => setForm(p => ({ ...p, matchCode: e.target.value.toUpperCase() }))} />
           <div className="grid grid-cols-2 gap-2">
-            <input type="number" className="bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none" placeholder={`${t1 ? (t1.shortName || t1.name) : 'T1'} runs`} value={form.team1Runs} onChange={e => setForm(p => ({ ...p, team1Runs: e.target.value }))} />
-            <input type="number" className="bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none" placeholder={`${t2 ? (t2.shortName || t2.name) : 'T2'} runs`} value={form.team2Runs} onChange={e => setForm(p => ({ ...p, team2Runs: e.target.value }))} />
+            <input type="number" className="bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none" placeholder={`${t1?.shortName ?? 'T1'} runs`} value={form.team1Runs} onChange={e => setForm(p => ({ ...p, team1Runs: e.target.value }))} />
+            <input type="number" className="bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none" placeholder={`${t2?.shortName ?? 'T2'} runs`} value={form.team2Runs} onChange={e => setForm(p => ({ ...p, team2Runs: e.target.value }))} />
           </div>
           <select className="w-full bg-slate-800 border border-slate-700 text-white text-xs rounded-lg px-2 py-1.5 focus:outline-none" value={form.winnerTeamId} onChange={e => setForm(p => ({ ...p, winnerTeamId: e.target.value }))}>
             <option value="">Result pending</option>
@@ -297,9 +319,7 @@ function FixtureCard({ fixture, teams, grounds, onUpdate, onDelete }: { fixture:
           </div>
         </div>
       ) : (
-        <button onClick={() => setEditing(true)} className="w-full text-xs text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500 rounded-lg py-1.5 transition-colors">
-          Edit
-        </button>
+        <button onClick={() => setEditing(true)} className="w-full text-xs text-slate-400 hover:text-white border border-slate-700 hover:border-slate-500 rounded-lg py-1.5 transition-colors">Edit</button>
       )}
     </div>
   );
@@ -312,29 +332,17 @@ function PointsTable({ tournament }: { tournament: Tournament }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
-        <thead>
-          <tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-slate-800">
-            <th className="text-left py-2 pr-4">Team</th>
-            <th className="py-2 px-2 text-center">P</th>
-            <th className="py-2 px-2 text-center">W</th>
-            <th className="py-2 px-2 text-center">L</th>
-            <th className="py-2 px-2 text-center">T</th>
-            <th className="py-2 px-2 text-center">Pts</th>
-            <th className="py-2 px-2 text-center">NRR</th>
-          </tr>
-        </thead>
+        <thead><tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-slate-800">
+          <th className="text-left py-2 pr-4">Team</th>
+          <th className="py-2 px-2 text-center">P</th><th className="py-2 px-2 text-center">W</th><th className="py-2 px-2 text-center">L</th><th className="py-2 px-2 text-center">T</th><th className="py-2 px-2 text-center">Pts</th><th className="py-2 px-2 text-center">NRR</th>
+        </tr></thead>
         <tbody>
           {table.map((entry, i) => {
             const team = tournament.teams.find(t => t.id === entry.teamId);
             if (!team) return null;
             return (
               <tr key={entry.teamId} className={`border-b border-slate-800/50 ${i < 4 ? 'text-white' : 'text-slate-400'}`}>
-                <td className="py-2 pr-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: team.color }} />
-                    <span className="font-medium">{team.shortName || team.name}</span>
-                  </div>
-                </td>
+                <td className="py-2 pr-4"><div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full" style={{ background: team.color }} /><span className="font-medium">{team.shortName || team.name}</span></div></td>
                 <td className="py-2 px-2 text-center">{entry.played}</td>
                 <td className="py-2 px-2 text-center text-green-400">{entry.won}</td>
                 <td className="py-2 px-2 text-center text-red-400">{entry.lost}</td>
@@ -352,7 +360,7 @@ function PointsTable({ tournament }: { tournament: Tournament }) {
 
 // ——— Tournament Detail ———
 function TournamentDetail({ tournament }: { tournament: Tournament }) {
-  const { addTeam, removeTeam, generateFixtures, updateFixture, removeFixture, setFixtureMode, removeGround } = useTournamentStore();
+  const { removeTeam, generateFixtures, updateFixture, removeFixture, setFixtureMode, removeGround, deleteTournament } = useTournamentStore();
   const [tab, setTab] = useState<DetailTab>('overview');
   const [showAddTeam, setShowAddTeam] = useState(false);
   const [showAddGround, setShowAddGround] = useState(false);
@@ -369,7 +377,6 @@ function TournamentDetail({ tournament }: { tournament: Tournament }) {
     { key: 'grounds', label: `Grounds (${grounds.length})`, icon: <MapPin className="w-3.5 h-3.5" /> },
   ];
 
-  // Derive unique stages in order
   const stageOrder = ['League', 'Group Stage', 'Quarter Final', 'Semi Final', 'Final', 'Plate Final'];
   const fixtureStages = Array.from(new Set(tournament.fixtures.map(f => f.stage))).sort((a, b) => {
     const ai = stageOrder.indexOf(a); const bi = stageOrder.indexOf(b);
@@ -380,7 +387,6 @@ function TournamentDetail({ tournament }: { tournament: Tournament }) {
 
   return (
     <div>
-      {/* Tabs */}
       <div className="flex gap-1 mb-6 bg-slate-800/40 p-1 rounded-xl overflow-x-auto">
         {tabs.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${tab === t.key ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'}`}>
@@ -395,8 +401,8 @@ function TournamentDetail({ tournament }: { tournament: Tournament }) {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
               { label: 'Format', val: FORMATS.find(f => f.value === tournament.format)?.label ?? tournament.format },
-              { label: 'Teams', val: tournament.teams.length.toString() },
-              { label: 'Fixtures', val: tournament.fixtures.length.toString() },
+              { label: 'Overs/Innings', val: String(tournament.oversPerInnings ?? 20) },
+              { label: 'Teams', val: String(tournament.teams.length) },
               { label: 'Status', val: tournament.status },
             ].map(item => (
               <div key={item.label} className="bg-slate-800/40 rounded-xl p-3 text-center">
@@ -434,17 +440,18 @@ function TournamentDetail({ tournament }: { tournament: Tournament }) {
                   <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs" style={{ background: team.color }}>{team.shortName?.[0] || team.name[0]}</div>
                   <div>
                     <p className="font-semibold text-white text-sm">{team.name}</p>
-                    {team.captainName && <p className="text-xs text-slate-500">c: {team.captainName}</p>}
+                    <p className="text-xs text-slate-500">
+                      {team.captainName && `c: ${team.captainName}`}
+                      {team.players?.length ? ` · ${team.players.filter(p => p).length} players` : ''}
+                    </p>
                   </div>
                 </div>
-                <button onClick={() => removeTeam(tournament.id, team.id)} className="p-1.5 text-slate-500 hover:text-red-400 transition-colors">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <button onClick={() => removeTeam(tournament.id, team.id)} className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
             ))}
           </div>
           {tournament.teams.length >= 2 && tournament.fixtures.length === 0 && (
-            <button onClick={() => generateFixtures(tournament.id)} className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-4 py-2 rounded-xl text-sm transition-colors mt-2">
+            <button onClick={() => generateFixtures(tournament.id)} className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-4 py-2 rounded-xl text-sm transition-colors">
               <Play className="w-4 h-4" /> Generate Fixtures
             </button>
           )}
@@ -454,57 +461,44 @@ function TournamentDetail({ tournament }: { tournament: Tournament }) {
       {/* Fixtures */}
       {tab === 'fixtures' && (
         <div className="space-y-4">
-          {/* Mode Toggle */}
           <div className="flex items-center gap-2 bg-slate-800/40 p-1 rounded-xl w-fit">
-            <button
-              onClick={() => setFixtureMode(tournament.id, 'auto')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${fixtureMode === 'auto' ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
+            <button onClick={() => setFixtureMode(tournament.id, 'auto')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${fixtureMode === 'auto' ? 'bg-green-600 text-white' : 'text-slate-400 hover:text-white'}`}>
               <Zap className="w-3.5 h-3.5" /> Auto
             </button>
-            <button
-              onClick={() => setFixtureMode(tournament.id, 'custom')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${fixtureMode === 'custom' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
-            >
+            <button onClick={() => setFixtureMode(tournament.id, 'custom')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${fixtureMode === 'custom' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}>
               <PenLine className="w-3.5 h-3.5" /> Custom
             </button>
           </div>
 
-          {/* Auto mode: generate button */}
           {fixtureMode === 'auto' && tournament.fixtures.length === 0 && tournament.teams.length >= 2 && (
             <button onClick={() => generateFixtures(tournament.id)} className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-4 py-2 rounded-xl text-sm transition-colors">
               <Play className="w-4 h-4" /> Generate Fixtures
             </button>
           )}
           {fixtureMode === 'auto' && tournament.fixtures.length === 0 && tournament.teams.length < 2 && (
-            <p className="text-slate-500 text-sm">Add at least 2 teams in the Teams tab, then generate fixtures.</p>
+            <p className="text-slate-500 text-sm">Add at least 2 teams first.</p>
           )}
 
-          {/* Custom mode: add fixture */}
-          {fixtureMode === 'custom' && (
+          {fixtureMode === 'custom' && tournament.teams.length >= 2 && (
             <>
-              {tournament.teams.length < 2 ? (
-                <p className="text-slate-500 text-sm">Add at least 2 teams first.</p>
-              ) : (
-                <>
-                  <AnimatePresence>
-                    {showAddFixture && (
-                      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
-                        <AddCustomFixtureForm tournament={tournament} onDone={() => setShowAddFixture(false)} />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                  {!showAddFixture && (
-                    <button onClick={() => setShowAddFixture(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-xl text-sm transition-colors">
-                      <Plus className="w-4 h-4" /> Add Fixture
-                    </button>
-                  )}
-                </>
+              <AnimatePresence>
+                {showAddFixture && (
+                  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                    <AddCustomFixtureForm tournament={tournament} onDone={() => setShowAddFixture(false)} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              {!showAddFixture && (
+                <button onClick={() => setShowAddFixture(true)} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-xl text-sm transition-colors">
+                  <Plus className="w-4 h-4" /> Add Fixture
+                </button>
               )}
             </>
           )}
+          {fixtureMode === 'custom' && tournament.teams.length < 2 && (
+            <p className="text-slate-500 text-sm">Add at least 2 teams first.</p>
+          )}
 
-          {/* Fixture List (both modes) */}
           {tournament.fixtures.length > 0 && (
             <div className="space-y-4">
               {fixtureStages.map(stage => {
@@ -515,13 +509,9 @@ function TournamentDetail({ tournament }: { tournament: Tournament }) {
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{stage}</h3>
                     <div className="grid gap-3 sm:grid-cols-2">
                       {stageFixtures.map(f => (
-                        <FixtureCard
-                          key={f.id}
-                          fixture={f}
-                          teams={tournament.teams}
-                          grounds={grounds}
+                        <FixtureCard key={f.id} fixture={f} teams={tournament.teams} grounds={grounds}
                           onUpdate={data => updateFixture(tournament.id, f.id, data)}
-                          onDelete={fixtureMode === 'custom' ? () => removeFixture(tournament.id, f.id) : undefined}
+                          onDelete={f.status !== 'completed' ? () => removeFixture(tournament.id, f.id) : undefined}
                         />
                       ))}
                     </div>
@@ -533,7 +523,7 @@ function TournamentDetail({ tournament }: { tournament: Tournament }) {
         </div>
       )}
 
-      {/* Points Table */}
+      {/* Points */}
       {tab === 'points' && <PointsTable tournament={tournament} />}
 
       {/* Grounds */}
@@ -554,27 +544,144 @@ function TournamentDetail({ tournament }: { tournament: Tournament }) {
           {grounds.length === 0 && !showAddGround && (
             <div className="text-center py-10">
               <MapPin className="w-12 h-12 text-slate-700 mx-auto mb-3" />
-              <p className="text-slate-500 text-sm">No grounds added yet. Add grounds to assign them to fixtures.</p>
+              <p className="text-slate-500 text-sm">No grounds added. Grounds can be assigned to fixtures.</p>
             </div>
           )}
           <div className="grid gap-3 sm:grid-cols-2">
             {grounds.map(ground => (
               <div key={ground.id} className="bg-[#0f1928] border border-[#1e3a5f] rounded-xl p-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-green-900/50 flex items-center justify-center">
-                    <MapPin className="w-4 h-4 text-green-400" />
-                  </div>
+                  <div className="w-8 h-8 rounded-full bg-green-900/50 flex items-center justify-center"><MapPin className="w-4 h-4 text-green-400" /></div>
                   <div>
                     <p className="font-semibold text-white text-sm">{ground.name}</p>
                     {ground.location && <p className="text-xs text-slate-500">{ground.location}</p>}
                   </div>
                 </div>
-                <button onClick={() => removeGround(tournament.id, ground.id)} className="p-1.5 text-slate-500 hover:text-red-400 transition-colors">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                <button onClick={() => removeGround(tournament.id, ground.id)} className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
               </div>
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ——— Teams Library ———
+function TeamsLibrary({ onBack }: { onBack: () => void }) {
+  const { managedTeams, createManagedTeam, updateManagedTeam, deleteManagedTeam } = useTournamentStore();
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState({ name: '', shortName: '', captainName: '', color: COLORS[0], players: Array(11).fill('') as string[] });
+
+  function resetForm() { setForm({ name: '', shortName: '', captainName: '', color: COLORS[0], players: Array(11).fill('') }); setEditId(null); }
+
+  function openEdit(mt: ManagedTeam) {
+    const players = [...mt.players]; while (players.length < 11) players.push('');
+    setForm({ name: mt.name, shortName: mt.shortName, captainName: mt.captainName, color: mt.color, players: players.slice(0, 11) });
+    setEditId(mt.id); setShowForm(true);
+  }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    const data = { name: form.name, shortName: form.shortName, captainName: form.captainName, color: form.color, players: form.players };
+    if (editId) updateManagedTeam(editId, data);
+    else createManagedTeam(data);
+    resetForm(); setShowForm(false);
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="text-slate-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></button>
+          <UserCircle2 className="w-5 h-5 text-blue-400" />
+          <div>
+            <h2 className="font-bold text-white">Teams Library</h2>
+            <p className="text-xs text-slate-400">Create reusable teams with player rosters</p>
+          </div>
+        </div>
+        {!showForm && (
+          <button onClick={() => { resetForm(); setShowForm(true); }} className="flex items-center gap-2 bg-blue-700 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors">
+            <Plus className="w-4 h-4" /> New Team
+          </button>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {showForm && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="mb-6">
+            <form onSubmit={submit} className="bg-[#0f1928] border border-[#1e3a5f] rounded-xl p-4 space-y-4">
+              <h3 className="font-semibold text-white">{editId ? 'Edit Team' : 'New Team'}</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className="text-xs text-slate-400 mb-1 block">Team Name *</label><input required className={cls('w-full')} placeholder="e.g. Karachi Kings" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></div>
+                <div><label className="text-xs text-slate-400 mb-1 block">Short Name</label><input className={cls('w-full')} placeholder="KK" maxLength={4} value={form.shortName} onChange={e => setForm(p => ({ ...p, shortName: e.target.value.toUpperCase() }))} /></div>
+                <div><label className="text-xs text-slate-400 mb-1 block">Captain Name</label><input className={cls('w-full')} placeholder="Captain" value={form.captainName} onChange={e => setForm(p => ({ ...p, captainName: e.target.value }))} /></div>
+                <div>
+                  <label className="text-xs text-slate-400 mb-1 block">Color</label>
+                  <div className="flex gap-1.5 flex-wrap mt-1">
+                    {COLORS.map(c => <button type="button" key={c} onClick={() => setForm(p => ({ ...p, color: c }))} className={`w-6 h-6 rounded-full border-2 ${form.color === c ? 'border-white' : 'border-transparent'}`} style={{ background: c }} />)}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-slate-400 mb-2 block flex items-center gap-1"><Star className="w-3 h-3 text-yellow-400" /> Player Names (11 players)</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                  {form.players.map((name, i) => (
+                    <div key={i} className="flex items-center gap-1">
+                      <span className="text-xs text-slate-600 w-4">{i + 1}.</span>
+                      <input className={cls('flex-1')} placeholder={`Player ${i + 1}`} value={name}
+                        onChange={e => setForm(p => { const players = [...p.players]; players[i] = e.target.value; return { ...p, players }; })} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" className="flex-1 bg-green-600 hover:bg-green-500 text-white font-semibold py-2 rounded-xl text-sm">{editId ? 'Save Changes' : 'Create Team'}</button>
+                <button type="button" onClick={() => { resetForm(); setShowForm(false); }} className="flex-1 bg-slate-700 text-white font-semibold py-2 rounded-xl text-sm">Cancel</button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {managedTeams.length === 0 && !showForm ? (
+        <div className="text-center py-20">
+          <UserCircle2 className="w-16 h-16 text-slate-700 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-white mb-2">No Teams Yet</h3>
+          <p className="text-slate-500">Create teams here and reuse them across any tournament.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {managedTeams.map((mt, i) => (
+            <motion.div key={mt.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
+              className="bg-[#0f1928] border border-[#1e3a5f] rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold" style={{ background: mt.color }}>{mt.shortName?.[0] || mt.name[0]}</div>
+                  <div>
+                    <h3 className="font-bold text-white">{mt.name}</h3>
+                    {mt.captainName && <p className="text-xs text-slate-500 flex items-center gap-1"><Star className="w-3 h-3 text-yellow-400" />{mt.captainName}</p>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => openEdit(mt)} className="p-1.5 text-slate-500 hover:text-blue-400 transition-colors"><PenLine className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => { if (confirm('Delete this team?')) deleteManagedTeam(mt.id); }} className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                </div>
+              </div>
+              {mt.players.filter(p => p).length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {mt.players.filter(p => p).slice(0, 6).map((p, i) => (
+                    <span key={i} className="text-xs bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">{p}</span>
+                  ))}
+                  {mt.players.filter(p => p).length > 6 && (
+                    <span className="text-xs text-slate-500">+{mt.players.filter(p => p).length - 6} more</span>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          ))}
         </div>
       )}
     </div>
@@ -590,6 +697,25 @@ export default function TournamentPage() {
 
   const tournamentList = Object.values(tournaments).sort((a, b) => b.createdAt - a.createdAt);
   const selected = selectedId ? tournaments[selectedId] : null;
+
+  if (view === 'teams_library') {
+    return (
+      <div className="min-h-screen bg-[#070d1a]">
+        <header className="bg-[#0f1928] border-b border-[#1e3a5f] sticky top-0 z-50">
+          <div className="max-w-5xl mx-auto px-4 py-4">
+            <div className="flex items-center gap-3">
+              <button onClick={() => router.push('/')} className="text-slate-400 hover:text-white"><ArrowLeft className="w-5 h-5" /></button>
+              <Trophy className="w-5 h-5 text-yellow-500" />
+              <h1 className="font-bold text-white">Tournaments</h1>
+            </div>
+          </div>
+        </header>
+        <main className="max-w-5xl mx-auto px-4 py-8">
+          <TeamsLibrary onBack={() => setView('list')} />
+        </main>
+      </div>
+    );
+  }
 
   if (view === 'create') {
     return (
@@ -639,9 +765,14 @@ export default function TournamentPage() {
               <p className="text-xs text-slate-400">Manage competitions</p>
             </div>
           </div>
-          <button onClick={() => setView('create')} className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors">
-            <Plus className="w-4 h-4" /> New
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setView('teams_library')} className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold px-3 py-2 rounded-lg text-sm transition-colors">
+              <UserCircle2 className="w-4 h-4" /> Teams
+            </button>
+            <button onClick={() => setView('create')} className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-colors">
+              <Plus className="w-4 h-4" /> New
+            </button>
+          </div>
         </div>
       </header>
 
@@ -672,7 +803,7 @@ export default function TournamentPage() {
                 <div className="flex gap-4 text-sm text-slate-400 mb-3">
                   <span>{t.teams.length} teams</span>
                   <span>{t.fixtures.length} fixtures</span>
-                  <span className="capitalize">{FORMATS.find(f => f.value === t.format)?.label ?? t.format}</span>
+                  <span>{t.oversPerInnings ?? 20} overs</span>
                 </div>
                 <div className="flex items-center justify-between text-xs text-slate-600">
                   <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{t.startDate || 'TBD'}</span>
