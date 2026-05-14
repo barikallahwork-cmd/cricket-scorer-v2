@@ -92,12 +92,28 @@ export default function GroundsPage() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.05 }}
-                        className="bg-[#0f1928] border border-[#1e3a5f] hover:border-green-700/50 rounded-xl p-4 cursor-pointer transition-colors"
-                        onClick={() => router.push(`/watch?code=${entry.matchCode}`)}
+                        className="bg-[#0f1928] border border-[#1e3a5f] hover:border-green-700/50 rounded-xl p-4 transition-colors"
                       >
                         <div className="flex items-start justify-between mb-3">
-                          <h3 className="font-bold text-white">{getMatchTitle(entry.match)}</h3>
-                          <span className={`text-xs font-bold text-white px-2 py-0.5 rounded-full ${cls}`}>{label}</span>
+                          <div
+                            className="flex-1 min-w-0 cursor-pointer"
+                            onClick={() => router.push(`/watch?code=${entry.matchCode}`)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-bold text-white">{getMatchTitle(entry.match)}</h3>
+                              <span className={`text-xs font-bold text-white px-2 py-0.5 rounded-full ${cls}`}>{label}</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              if (confirm('Delete this match from the live feed?')) {
+                                await deleteFirebaseMatch(entry.matchCode);
+                              }
+                            }}
+                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-red-900/50 text-slate-500 hover:text-red-400 transition-colors shrink-0 ml-2"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                         {scoreDisplay(entry.match) && (
                           <p className="text-green-400 font-mono text-sm mb-2">{scoreDisplay(entry.match)}</p>
