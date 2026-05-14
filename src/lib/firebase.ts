@@ -1,5 +1,5 @@
-import { initializeApp, getApps } from 'firebase/app';
-import { getDatabase } from 'firebase/database';
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { getDatabase, Database } from 'firebase/database';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyAkjCoAqlDXTtjtlbgLOgxmtb5garZrhIw',
@@ -11,5 +11,18 @@ const firebaseConfig = {
   databaseURL: 'https://cricscorer-40848-default-rtdb.firebaseio.com',
 };
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-export const database = getDatabase(app);
+let _db: Database | null = null;
+
+export function getFirebaseDB(): Database | null {
+  if (typeof window === 'undefined') return null;
+  if (_db) return _db;
+  try {
+    const app: FirebaseApp = getApps().length === 0
+      ? initializeApp(firebaseConfig)
+      : getApps()[0];
+    _db = getDatabase(app);
+    return _db;
+  } catch {
+    return null;
+  }
+}
