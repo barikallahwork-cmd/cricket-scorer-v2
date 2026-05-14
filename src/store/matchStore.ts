@@ -143,6 +143,9 @@ export const useMatchStore = create<Store>()(
 
       createMatch({ format, maxOvers, venue, date, team1, team2 }) {
         const id = generateId();
+        const matchCode = 'CRK' + Math.floor(10000 + Math.random() * 90000).toString();
+        const scorerCode = 'SCR' + Math.floor(1000 + Math.random() * 9000).toString();
+        const adminCode = 'ADM' + Math.floor(1000 + Math.random() * 9000).toString();
         const match: Match = {
           id,
           status: 'toss',
@@ -158,6 +161,9 @@ export const useMatchStore = create<Store>()(
           updatedAt: Date.now(),
           result: undefined,
           isSuperOver: false,
+          matchCode,
+          scorerCode,
+          adminCode,
         };
         set(s => ({
           matches: { ...s.matches, [id]: match },

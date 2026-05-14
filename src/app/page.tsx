@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useMatchStore from '@/store/matchStore';
-import { motion } from 'framer-motion';
-import { Activity, Plus, Play, Trash2, Calendar, MapPin } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Activity, Plus, Play, Trash2, Calendar, MapPin, Users, X } from 'lucide-react';
 import { Match } from '@/store/types';
 import { getMatchTitle } from '@/utils/formatting';
 
@@ -30,10 +30,18 @@ export default function HomePage() {
   const router = useRouter();
   const { matches, activeMatchId, setActiveMatch, deleteMatch } = useMatchStore();
   const matchList = Object.values(matches).sort((a, b) => b.updatedAt - a.updatedAt);
+  const [showJoin, setShowJoin] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
 
   function resumeMatch(id: string) {
     setActiveMatch(id);
     router.push('/scorer');
+  }
+
+  function handleJoin() {
+    const code = joinCode.trim().toUpperCase();
+    if (!code) return;
+    router.push(`/watch?code=${code}`);
   }
 
   return (
@@ -50,13 +58,22 @@ export default function HomePage() {
               <p className="text-xs text-slate-400">Live Cricket Scorer</p>
             </div>
           </div>
-          <button
-            onClick={() => router.push('/scorer?new=1')}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            New Match
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowJoin(true)}
+              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
+            >
+              <Users className="w-4 h-4" />
+              Join Match
+            </button>
+            <button
+              onClick={() => router.push('/scorer?new=1')}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              New Match
+            </button>
+          </div>
         </div>
       </header>
 
@@ -169,6 +186,52 @@ export default function HomePage() {
           Open Display Screen
         </button>
       </div>
+
+      {/* Join Match Modal */}
+      <AnimatePresence>
+        {showJoin && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowJoin(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#0f1928] border border-[#1e3a5f] rounded-2xl p-6 w-full max-w-sm"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-white">Join Live Match</h2>
+                <button onClick={() => setShowJoin(false)} className="text-slate-400 hover:text-white">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <p className="text-slate-400 text-sm mb-4">Enter the match code shared by the scorer</p>
+              <input
+                autoFocus
+                type="text"
+                placeholder="e.g. CRK82741"
+                value={joinCode}
+                onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                onKeyDown={e => e.key === 'Enter' && handleJoin()}
+                className="w-full bg-slate-800 border border-slate-600 text-white font-mono text-lg text-center rounded-xl px-4 py-3 mb-4 focus:outline-none focus:border-green-500 placeholder-slate-500 tracking-widest"
+                maxLength={10}
+              />
+              <button
+                onClick={handleJoin}
+                disabled={!joinCode.trim()}
+                className="w-full bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 text-white font-semibold py-3 rounded-xl transition-colors"
+              >
+                Watch Live
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

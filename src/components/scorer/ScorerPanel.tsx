@@ -267,6 +267,17 @@ function Header({ match }: { match?: Match }) {
               LIVE
             </span>
           )}
+          {match?.matchCode && (
+            <button
+              onClick={() => {
+                navigator.clipboard?.writeText(match.matchCode!).catch(() => {});
+              }}
+              className="text-xs font-mono bg-green-900/50 border border-green-700/50 text-green-400 px-2 py-0.5 rounded-full hover:bg-green-800/60 transition-colors"
+              title="Match code — click to copy"
+            >
+              {match.matchCode}
+            </button>
+          )}
           <button
             onClick={() => window.open(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/display`, '_blank', 'noopener')}
             className="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"

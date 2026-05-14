@@ -155,6 +155,9 @@ export interface Match {
   updatedAt: number;
   result?: string;
   isSuperOver: boolean;
+  matchCode?: string;
+  scorerCode?: string;
+  adminCode?: string;
   dls?: {
     target: number;
     overs: number;

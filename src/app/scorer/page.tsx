@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation';
 import useMatchStore from '@/store/matchStore';
 import ScorerPanel from '@/components/scorer/ScorerPanel';
 import MatchSetup from '@/components/scorer/MatchSetup';
+import { useFirebaseSync } from '@/hooks/useFirebaseSync';
 
 export default function ScorerPage() {
   const router = useRouter();
   const { activeMatchId, matches } = useMatchStore();
   const [showSetup, setShowSetup] = useState(false);
   const [ready, setReady] = useState(false);
+  useFirebaseSync();
 
   useEffect(() => {
     // Read URL params client-side — avoids useSearchParams static export issue
