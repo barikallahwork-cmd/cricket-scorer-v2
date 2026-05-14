@@ -89,7 +89,7 @@ export default function WatchPage() {
 
   return (
     <div className="relative">
-      <div className="fixed top-2 left-2 z-50 flex items-center gap-1.5 bg-black/60 backdrop-blur px-2 py-1 rounded-full text-xs text-green-400">
+      <div className="fixed bottom-4 right-4 z-50 flex items-center gap-1.5 bg-black/60 backdrop-blur px-2 py-1 rounded-full text-xs text-green-400">
         <Wifi className="w-3 h-3" />
         LIVE · {matchCode}
       </div>
