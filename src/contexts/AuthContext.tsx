@@ -21,6 +21,11 @@ const AuthContext = createContext<AuthContextValue>({
 
 async function loadUserData(uid: string) {
   const db = getFirebaseFirestore();
+
+  // Resume persist so new state gets written to localStorage after load
+  (useMatchStore as any).persist?.resume?.();
+  (useTournamentStore as any).persist?.resume?.();
+
   if (!db) return;
   try {
     const [matchSnap, tournamentSnap] = await Promise.all([
@@ -37,7 +42,7 @@ async function loadUserData(uid: string) {
         broadcastVersion: data.broadcastVersion ?? 0,
       });
     } else {
-      // First login — read directly from localStorage (Zustand may not be hydrated yet)
+      // Firestore has no data — read from localStorage (still intact because persist was paused on logout)
       try {
         const raw = typeof window !== 'undefined' ? localStorage.getItem('cricket-scorer-v2') : null;
         const stored = raw ? JSON.parse(raw) : null;
@@ -86,6 +91,11 @@ async function loadUserData(uid: string) {
 }
 
 function clearStores() {
+  // Pause persist BEFORE clearing so localStorage keeps the pre-logout data.
+  // This means the old data survives as a fallback for migration if Firestore
+  // is unavailable on the next login. loadUserData() will resume persist after loading.
+  (useMatchStore as any).persist?.pause?.();
+  (useTournamentStore as any).persist?.pause?.();
   useMatchStore.setState({ matches: {}, activeMatchId: null, commentary: [], broadcastVersion: 0 });
   useTournamentStore.setState({ tournaments: {}, managedTeams: [], version: 0 });
 }
@@ -129,28 +139,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const auth = getFirebaseAuth();
     if (!auth) return;
 
-    // Sync to Firestore immediately before clearing local data
+    // Sync current state to Firestore immediately before signing out
     const db = getFirebaseFirestore();
     if (db && user) {
       const uid = user.uid;
       const { matches, activeMatchId, commentary, broadcastVersion } = useMatchStore.getState();
       const { tournaments, managedTeams, version } = useTournamentStore.getState();
-      let syncedOk = false;
       try {
         await Promise.all([
           setDoc(doc(db, 'users', uid, 'data', 'matches'), { matches, activeMatchId, commentary, broadcastVersion, updatedAt: Date.now() }),
           setDoc(doc(db, 'users', uid, 'data', 'tournaments'), { tournaments, managedTeams, version, updatedAt: Date.now() }),
         ]);
-        syncedOk = true;
       } catch {}
-
-      // Only clear localStorage if sync succeeded — keeps data as fallback if offline
-      if (syncedOk) {
-        try {
-          localStorage.removeItem('cricket-scorer-v2');
-          localStorage.removeItem('cricket-tournament-v1');
-        } catch {}
-      }
     }
 
     await signOut(auth);
