@@ -88,10 +88,6 @@ async function loadUserData(uid: string) {
 function clearStores() {
   useMatchStore.setState({ matches: {}, activeMatchId: null, commentary: [], broadcastVersion: 0 });
   useTournamentStore.setState({ tournaments: {}, managedTeams: [], version: 0 });
-  try {
-    localStorage.removeItem('cricket-scorer-v2');
-    localStorage.removeItem('cricket-tournament-v1');
-  } catch {}
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -131,8 +127,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     const auth = getFirebaseAuth();
-    if (auth) await signOut(auth);
-  }, []);
+    if (!auth) return;
+
+    // Sync to Firestore immediately before clearing local data
+    const db = getFirebaseFirestore();
+    if (db && user) {
+      const uid = user.uid;
+      const { matches, activeMatchId, commentary, broadcastVersion } = useMatchStore.getState();
+      const { tournaments, managedTeams, version } = useTournamentStore.getState();
+      let syncedOk = false;
+      try {
+        await Promise.all([
+          setDoc(doc(db, 'users', uid, 'data', 'matches'), { matches, activeMatchId, commentary, broadcastVersion, updatedAt: Date.now() }),
+          setDoc(doc(db, 'users', uid, 'data', 'tournaments'), { tournaments, managedTeams, version, updatedAt: Date.now() }),
+        ]);
+        syncedOk = true;
+      } catch {}
+
+      // Only clear localStorage if sync succeeded — keeps data as fallback if offline
+      if (syncedOk) {
+        try {
+          localStorage.removeItem('cricket-scorer-v2');
+          localStorage.removeItem('cricket-tournament-v1');
+        } catch {}
+      }
+    }
+
+    await signOut(auth);
+  }, [user]);
 
   return (
     <AuthContext.Provider value={{ user, loading, logout }}>
