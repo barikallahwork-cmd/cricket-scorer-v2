@@ -35,11 +35,10 @@ export function useMatchFirestoreSync(userId: string | null) {
     return () => clearTimeout(t);
   }, [userId]);
 
-  // Debounced sync on state change
+  // Sync immediately on every state change (after initial 3s delay)
   useEffect(() => {
     if (!userId || !syncReady.current) return;
-    const timer = setTimeout(() => { syncMatches(userId).catch(() => {}); }, 1500);
-    return () => clearTimeout(timer);
+    syncMatches(userId).catch(() => {});
   }, [broadcastVersion, userId]);
 
   // Immediate sync when tab becomes hidden (covers browser close / tab switch)
@@ -68,8 +67,7 @@ export function useTournamentFirestoreSync(userId: string | null) {
 
   useEffect(() => {
     if (!userId || !syncReady.current) return;
-    const timer = setTimeout(() => { syncTournaments(userId).catch(() => {}); }, 1500);
-    return () => clearTimeout(timer);
+    syncTournaments(userId).catch(() => {});
   }, [version, userId]);
 
   useEffect(() => {
