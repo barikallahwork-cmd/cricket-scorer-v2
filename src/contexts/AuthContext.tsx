@@ -37,17 +37,23 @@ async function loadUserData(uid: string) {
         broadcastVersion: data.broadcastVersion ?? 0,
       });
     } else {
-      // First login — migrate any existing localStorage data to Firestore
-      const current = useMatchStore.getState();
-      if (Object.keys(current.matches).length > 0) {
-        await setDoc(doc(db, 'users', uid, 'data', 'matches'), {
-          matches: current.matches,
-          activeMatchId: current.activeMatchId,
-          commentary: current.commentary,
-          broadcastVersion: current.broadcastVersion,
-          updatedAt: Date.now(),
-        });
-      }
+      // First login — read directly from localStorage (Zustand may not be hydrated yet)
+      try {
+        const raw = typeof window !== 'undefined' ? localStorage.getItem('cricket-scorer-v2') : null;
+        const stored = raw ? JSON.parse(raw) : null;
+        const localState = stored?.state ?? {};
+        const localMatches = localState.matches ?? {};
+        if (Object.keys(localMatches).length > 0) {
+          useMatchStore.setState(localState);
+          await setDoc(doc(db, 'users', uid, 'data', 'matches'), {
+            matches: localMatches,
+            activeMatchId: localState.activeMatchId ?? null,
+            commentary: localState.commentary ?? [],
+            broadcastVersion: localState.broadcastVersion ?? 0,
+            updatedAt: Date.now(),
+          });
+        }
+      } catch {}
     }
 
     if (tournamentSnap.exists()) {
@@ -58,15 +64,21 @@ async function loadUserData(uid: string) {
         version: data.version ?? 0,
       });
     } else {
-      const current = useTournamentStore.getState();
-      if (Object.keys(current.tournaments).length > 0) {
-        await setDoc(doc(db, 'users', uid, 'data', 'tournaments'), {
-          tournaments: current.tournaments,
-          managedTeams: current.managedTeams,
-          version: current.version,
-          updatedAt: Date.now(),
-        });
-      }
+      try {
+        const raw = typeof window !== 'undefined' ? localStorage.getItem('cricket-tournament-v1') : null;
+        const stored = raw ? JSON.parse(raw) : null;
+        const localState = stored?.state ?? {};
+        const localTournaments = localState.tournaments ?? {};
+        if (Object.keys(localTournaments).length > 0) {
+          useTournamentStore.setState(localState);
+          await setDoc(doc(db, 'users', uid, 'data', 'tournaments'), {
+            tournaments: localTournaments,
+            managedTeams: localState.managedTeams ?? [],
+            version: localState.version ?? 0,
+            updatedAt: Date.now(),
+          });
+        }
+      } catch {}
     }
   } catch {
     // Silent fail — app still works with local data

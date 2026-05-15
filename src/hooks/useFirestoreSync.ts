@@ -1,12 +1,29 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { getFirebaseFirestore } from '@/lib/firebase';
 import useMatchStore from '@/store/matchStore';
 import useTournamentStore from '@/store/tournamentStore';
 
-// Match store — debounced sync on every broadcastVersion change
+async function syncMatches(userId: string) {
+  const db = getFirebaseFirestore();
+  if (!db) return;
+  const { matches, activeMatchId, commentary, broadcastVersion } = useMatchStore.getState();
+  await setDoc(doc(db, 'users', userId, 'data', 'matches'), {
+    matches, activeMatchId, commentary, broadcastVersion, updatedAt: Date.now(),
+  });
+}
+
+async function syncTournaments(userId: string) {
+  const db = getFirebaseFirestore();
+  if (!db) return;
+  const { tournaments, managedTeams, version } = useTournamentStore.getState();
+  await setDoc(doc(db, 'users', userId, 'data', 'tournaments'), {
+    tournaments, managedTeams, version, updatedAt: Date.now(),
+  });
+}
+
 export function useMatchFirestoreSync(userId: string | null) {
   const broadcastVersion = useMatchStore(s => s.broadcastVersion);
   const syncReady = useRef(false);
@@ -14,34 +31,30 @@ export function useMatchFirestoreSync(userId: string | null) {
   useEffect(() => {
     syncReady.current = false;
     if (!userId) return;
-    // Allow 3s for Firestore data load before enabling outbound sync
     const t = setTimeout(() => { syncReady.current = true; }, 3000);
     return () => clearTimeout(t);
   }, [userId]);
 
+  // Debounced sync on state change
   useEffect(() => {
     if (!userId || !syncReady.current) return;
-    const db = getFirebaseFirestore();
-    if (!db) return;
-
-    const timer = setTimeout(async () => {
-      const { matches, activeMatchId, commentary, broadcastVersion: bv } = useMatchStore.getState();
-      try {
-        await setDoc(doc(db, 'users', userId, 'data', 'matches'), {
-          matches,
-          activeMatchId,
-          commentary,
-          broadcastVersion: bv,
-          updatedAt: Date.now(),
-        });
-      } catch {}
-    }, 5000);
-
+    const timer = setTimeout(() => { syncMatches(userId).catch(() => {}); }, 1500);
     return () => clearTimeout(timer);
   }, [broadcastVersion, userId]);
+
+  // Immediate sync when tab becomes hidden (covers browser close / tab switch)
+  useEffect(() => {
+    if (!userId) return;
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden' && syncReady.current) {
+        syncMatches(userId).catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [userId]);
 }
 
-// Tournament store — debounced sync on every version change
 export function useTournamentFirestoreSync(userId: string | null) {
   const version = useTournamentStore(s => s.version);
   const syncReady = useRef(false);
@@ -55,21 +68,18 @@ export function useTournamentFirestoreSync(userId: string | null) {
 
   useEffect(() => {
     if (!userId || !syncReady.current) return;
-    const db = getFirebaseFirestore();
-    if (!db) return;
-
-    const timer = setTimeout(async () => {
-      const { tournaments, managedTeams, version: v } = useTournamentStore.getState();
-      try {
-        await setDoc(doc(db, 'users', userId, 'data', 'tournaments'), {
-          tournaments,
-          managedTeams,
-          version: v,
-          updatedAt: Date.now(),
-        });
-      } catch {}
-    }, 5000);
-
+    const timer = setTimeout(() => { syncTournaments(userId).catch(() => {}); }, 1500);
     return () => clearTimeout(timer);
   }, [version, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden' && syncReady.current) {
+        syncTournaments(userId).catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [userId]);
 }
