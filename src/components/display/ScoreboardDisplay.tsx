@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ref, onValue, off } from 'firebase/database';
 import useMatchStore from '@/store/matchStore';
+import { getFirebaseDB } from '@/lib/firebase';
 import { useBroadcastReceiver } from '@/hooks/useBroadcastSync';
 import { getTeam, getPlayerName, getInnings, getStriker, getNonStriker } from '@/utils/formatting';
 import { calcStrikeRate, calcEconomy, calcRunRate, calcRequiredRunRate, ballCode, ballColor, oversDisplay } from '@/utils/calculations';
@@ -257,11 +259,40 @@ function CommentaryTicker({ commentary }: { commentary: string[] }) {
   );
 }
 
-export default function ScoreboardDisplay() {
+export default function ScoreboardDisplay({ matchCode }: { matchCode?: string | null }) {
+  // Same-browser sync (BroadcastChannel + localStorage) — used when no matchCode
   useBroadcastReceiver();
+
+  // RTDB live listener — used when matchCode is provided (separate screen / different device)
+  const [remoteMatch, setRemoteMatch] = useState<Match | null>(null);
+  const [remoteCommentary, setRemoteCommentary] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!matchCode) return;
+    const db = getFirebaseDB();
+    if (!db) return;
+    const dbRef = ref(db, `matches/${matchCode}`);
+    const handler = onValue(dbRef, (snapshot) => {
+      try {
+        const raw = snapshot.val();
+        if (!raw?.payload) return;
+        const data = JSON.parse(raw.payload);
+        const active = data.matches?.[data.activeMatchId] ?? null;
+        setRemoteMatch(active);
+        setRemoteCommentary(data.commentary ?? []);
+      } catch {}
+    });
+    return () => off(dbRef, 'value', handler);
+  }, [matchCode]);
+
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const { matches, activeMatchId, commentary } = useMatchStore();
-  const match = activeMatchId ? matches[activeMatchId] : null;
+  const storeMatches = useMatchStore(s => s.matches);
+  const storeActiveId = useMatchStore(s => s.activeMatchId);
+  const storeCommentary = useMatchStore(s => s.commentary);
+
+  // When matchCode provided: use RTDB data; otherwise use local store
+  const match: Match | null = matchCode ? remoteMatch : (storeActiveId ? storeMatches[storeActiveId] : null);
+  const commentary = matchCode ? remoteCommentary : storeCommentary;
 
   function toggleFullscreen() {
     if (!document.fullscreenElement) {

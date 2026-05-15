@@ -116,6 +116,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, []);
 
+  // Re-fetch from Firestore when tab becomes visible (picks up changes from other devices)
+  useEffect(() => {
+    if (!user) return;
+    const uid = user.uid;
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadUserData(uid).catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [user]);
+
   const logout = useCallback(async () => {
     const auth = getFirebaseAuth();
     if (auth) await signOut(auth);
