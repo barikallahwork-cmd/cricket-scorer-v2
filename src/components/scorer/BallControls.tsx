@@ -126,7 +126,7 @@ export default function BallControls({ match, innings }: Props) {
       </AnimatePresence>
 
       {/* Players Info */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3">
         {/* Batsmen */}
         <div className="score-card">
           <div className="space-y-2">
@@ -136,7 +136,7 @@ export default function BallControls({ match, innings }: Props) {
             ].map(({ id, score, isStriker }) => (
               <div key={id} className={`p-2 rounded-lg ${isStriker ? 'bg-green-900/30 border border-green-700/40' : 'bg-slate-800/40'}`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-white truncate max-w-[120px]">
+                  <span className="text-xs sm:text-sm font-semibold text-white truncate max-w-[90px] sm:max-w-[120px]">
                     {isStriker && <span className="text-green-400 mr-1">*</span>}
                     {getPlayerName(match, id)}
                   </span>
@@ -209,13 +209,13 @@ export default function BallControls({ match, innings }: Props) {
 
       {/* Run Buttons */}
       <div>
-        <div className="grid grid-cols-7 gap-2">
+        <div className="grid grid-cols-7 gap-1 sm:gap-2">
           {RUN_BUTTONS.map(r => (
             <motion.button
               key={r}
               whileTap={{ scale: 0.9 }}
               onClick={() => handleRun(r)}
-              className={`btn-run h-16 text-2xl font-bold flex items-center justify-center
+              className={`btn-run h-12 sm:h-16 text-xl sm:text-2xl font-bold flex items-center justify-center
                 ${r === 4 ? 'bg-blue-700 hover:bg-blue-600' :
                   r === 6 ? 'bg-purple-700 hover:bg-purple-600' :
                   r === 0 ? 'bg-slate-700 hover:bg-slate-600 text-slate-300' :
@@ -225,7 +225,7 @@ export default function BallControls({ match, innings }: Props) {
             </motion.button>
           ))}
         </div>
-        <div className="text-center text-xs text-slate-600 mt-1">Keyboard: 0-6 = runs, W = wicket, Ctrl+Z = undo</div>
+        <div className="hidden sm:block text-center text-xs text-slate-600 mt-1">Keyboard: 0-6 = runs, W = wicket, Ctrl+Z = undo</div>
       </div>
 
       {/* Wicket Button */}
@@ -239,7 +239,7 @@ export default function BallControls({ match, innings }: Props) {
       </motion.button>
 
       {/* Extras Row */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 gap-1 sm:gap-2">
         {[
           { label: 'Wide', type: 'wide', short: 'Wd' },
           { label: 'No Ball', type: 'noball', short: 'Nb' },
@@ -250,12 +250,12 @@ export default function BallControls({ match, innings }: Props) {
             key={e.type}
             whileTap={{ scale: 0.95 }}
             onClick={() => handleExtraRuns(e.type)}
-            className={`btn-extra py-3 flex flex-col items-center gap-0.5 ${
+            className={`btn-extra py-2.5 sm:py-3 flex flex-col items-center gap-0.5 ${
               pendingExtraType === e.type ? 'ring-2 ring-yellow-400' : ''
             }`}
           >
-            <span className="font-bold">{e.short}</span>
-            <span className="text-xs opacity-75">{e.label}</span>
+            <span className="font-bold text-sm sm:text-base">{e.short}</span>
+            <span className="text-xs opacity-75 hidden sm:block">{e.label}</span>
           </motion.button>
         ))}
       </div>

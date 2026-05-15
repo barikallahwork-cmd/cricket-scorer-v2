@@ -258,15 +258,15 @@ export default function MatchSetup({ onComplete }: { onComplete: () => void }) {
                     <span className="text-xs text-slate-500 bg-slate-800/60 px-2 py-0.5 rounded">{f.stage}</span>
                     <ChevronRight className="w-4 h-4 text-slate-500" />
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ background: t1.color }} />
-                      <span className="font-semibold text-white">{t1.name}</span>
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="w-3 h-3 rounded-full shrink-0" style={{ background: t1.color }} />
+                      <span className="font-semibold text-white text-sm truncate">{t1.name}</span>
                     </div>
-                    <span className="text-slate-500 text-sm">vs</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-white">{t2.name}</span>
-                      <div className="w-3 h-3 rounded-full" style={{ background: t2.color }} />
+                    <span className="text-slate-500 text-xs shrink-0">vs</span>
+                    <div className="flex items-center gap-1.5 min-w-0 justify-end">
+                      <span className="font-semibold text-white text-sm truncate">{t2.name}</span>
+                      <div className="w-3 h-3 rounded-full shrink-0" style={{ background: t2.color }} />
                     </div>
                   </div>
                   {(f.date || f.ground) && (

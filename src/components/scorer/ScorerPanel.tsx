@@ -282,7 +282,7 @@ function Header({ match }: { match?: Match }) {
           )}
           {match?.matchCode && (
             <>
-              <span className="text-xs font-mono bg-green-900/50 border border-green-700/50 text-green-400 px-2 py-0.5 rounded-full">
+              <span className="hidden sm:inline-flex text-xs font-mono bg-green-900/50 border border-green-700/50 text-green-400 px-2 py-0.5 rounded-full">
                 {match.matchCode}
               </span>
               <button
@@ -349,7 +349,7 @@ function Header({ match }: { match?: Match }) {
           </AnimatePresence>
           <button
             onClick={() => window.open(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ''}/display`, '_blank', 'noopener')}
-            className="p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            className="hidden sm:flex p-2 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
             title="Open display screen"
           >
             <ExternalLink className="w-4 h-4" />
@@ -371,13 +371,13 @@ function ScoreHeader({ match, innings }: { match: any; innings: any }) {
   const needed = isSecond && innings.targetRuns ? innings.targetRuns - innings.runs : null;
 
   return (
-    <div className="flex flex-wrap items-center gap-4 justify-between">
-      <div className="flex items-center gap-4">
-        <div>
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="shrink-0">
           <div className="text-xs text-slate-400">{battingTeam.shortName}</div>
           <motion.div
             key={`${innings.runs}-${innings.wickets}`}
-            className="text-3xl font-black text-white leading-none"
+            className="text-2xl sm:text-3xl font-black text-white leading-none"
             animate={{ scale: [1, 1.05, 1] }}
             transition={{ duration: 0.2 }}
           >
@@ -386,16 +386,16 @@ function ScoreHeader({ match, innings }: { match: any; innings: any }) {
           <div className="text-xs text-slate-400">{innings.overs}.{innings.balls} ov</div>
         </div>
         {isSecond && firstInn && (
-          <div className="text-sm text-slate-400">
+          <div className="text-xs sm:text-sm text-slate-400 shrink-0">
             vs <span className="text-white font-semibold">{firstInn.runs}/{firstInn.wickets}</span>
           </div>
         )}
       </div>
-      <div className="flex gap-4 text-sm">
+      <div className="flex gap-2 sm:gap-4 text-xs sm:text-sm shrink-0">
         {isSecond && needed !== null && (
           <div className="text-center">
             <div className="text-slate-400 text-xs">Need</div>
-            <div className="font-bold text-orange-400">{needed} off {(match.maxOvers * 6) - innings.legalBalls}b</div>
+            <div className="font-bold text-orange-400 text-xs sm:text-sm">{needed}<span className="hidden sm:inline"> off {(match.maxOvers * 6) - innings.legalBalls}b</span></div>
           </div>
         )}
         <div className="text-center">
@@ -411,7 +411,7 @@ function ScoreHeader({ match, innings }: { match: any; innings: any }) {
           </div>
         )}
         {match.innings[1] === undefined && (
-          <div className="text-center">
+          <div className="text-center hidden sm:block">
             <div className="text-slate-400 text-xs">Proj</div>
             <div className="font-bold text-blue-400">
               {innings.legalBalls > 0

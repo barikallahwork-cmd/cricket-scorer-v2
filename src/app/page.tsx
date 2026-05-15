@@ -78,31 +78,31 @@ export default function HomePage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => router.push('/grounds')}
-              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
+              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm"
             >
               <Globe className="w-4 h-4" />
-              Grounds
+              <span className="hidden sm:inline">Grounds</span>
             </button>
             <button
               onClick={() => router.push('/tournament')}
-              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
+              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm"
             >
               <Activity className="w-4 h-4" />
-              Tournament
+              <span className="hidden sm:inline">Tournament</span>
             </button>
             <button
               onClick={() => setShowJoin(true)}
-              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
+              className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-white font-semibold px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm"
             >
               <Users className="w-4 h-4" />
-              Join Match
+              <span className="hidden xs:inline sm:inline">Join</span>
             </button>
             <button
               onClick={() => router.push('/scorer?new=1')}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-4 py-2 rounded-lg transition-colors text-sm"
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white font-semibold px-3 sm:px-4 py-2 rounded-lg transition-colors text-sm"
             >
               <Plus className="w-4 h-4" />
-              New Match
+              <span className="hidden xs:inline sm:inline">New</span>
             </button>
           </div>
         </div>

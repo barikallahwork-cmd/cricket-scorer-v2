@@ -68,8 +68,8 @@ function ScoreDisplay({ match, innings }: { match: Match; innings: Innings }) {
           animate={{ opacity: 1, y: 0 }}
           className="bg-orange-500/15 border border-orange-500/30 rounded-xl px-4 py-2.5 mb-3"
         >
-          <span className="text-orange-300 font-bold text-lg">
-            {getTeam(match, innings.battingTeamId).shortName} need <span className="text-2xl">{needed}</span> runs from <span className="text-2xl">{ballsLeft}</span> balls
+          <span className="text-orange-300 font-bold text-sm sm:text-lg">
+            {getTeam(match, innings.battingTeamId).shortName} need <span className="text-base sm:text-2xl">{needed}</span> runs from <span className="text-base sm:text-2xl">{ballsLeft}</span> balls
           </span>
         </motion.div>
       )}
@@ -334,15 +334,15 @@ export default function ScoreboardDisplay() {
     <div className="min-h-screen bg-[#070d1a] flex flex-col" style={{ fontFamily: 'Inter, system-ui' }}>
       {/* Top Bar */}
       <div className="bg-[#0f1928] border-b border-[#1e3a5f] px-4 py-2.5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-7 h-7 rounded bg-green-600 flex items-center justify-center">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <div className="w-7 h-7 rounded bg-green-600 flex items-center justify-center shrink-0">
             <Activity className="w-4 h-4 text-white" />
           </div>
-          <span className="font-bold text-white">
+          <span className="font-bold text-white truncate">
             {match.teams[0].shortName} vs {match.teams[1].shortName}
           </span>
-          <span className="text-slate-500 text-sm">{match.format} • {match.maxOvers} ov</span>
-          {match.venue && <span className="text-slate-600 text-sm">@ {match.venue}</span>}
+          <span className="text-slate-500 text-sm shrink-0 hidden xs:inline">{match.format} • {match.maxOvers} ov</span>
+          {match.venue && <span className="text-slate-600 text-sm hidden md:inline">@ {match.venue}</span>}
         </div>
         <div className="flex items-center gap-3">
           <LiveDot />
