@@ -454,24 +454,50 @@ export const useMatchStore = create<Store>()(
               innings.strikerIndex = innings.strikerIndex === 0 ? 1 : 0;
             }
 
+            const oversExhausted = innings.overs >= match.maxOvers;
+            const allOutAtOverEnd = innings.wickets >= 10;
             const overTargetChased = match.currentInningsIndex === 1 && innings.targetRuns > 0 && innings.runs >= innings.targetRuns;
-            if (overTargetChased) {
+
+            if (overTargetChased || oversExhausted || allOutAtOverEnd) {
               innings.isCompleted = true;
-              const result = computeResult(match.teams, match.currentInningsIndex, innings, match.innings[0]);
-              set(s => ({
-                matches: {
-                  ...s.matches,
-                  [activeMatchId]: {
-                    ...match,
-                    innings: match.innings.map((inn, i) => i === inningsIdx ? innings : inn),
-                    status: 'finished',
-                    result,
-                    updatedAt: Date.now(),
+              const isLastInnings = match.currentInningsIndex >= 1;
+              if (isLastInnings) {
+                const result = computeResult(match.teams, match.currentInningsIndex, innings, match.innings[0]);
+                set(s => ({
+                  matches: {
+                    ...s.matches,
+                    [activeMatchId]: {
+                      ...match,
+                      innings: match.innings.map((inn, i) => i === inningsIdx ? innings : inn),
+                      status: 'finished',
+                      result,
+                      updatedAt: Date.now(),
+                    },
                   },
-                },
-                commentary: [commentary_text, ...commentary.slice(0, 49)],
-                broadcastVersion: s.broadcastVersion + 1,
-              }));
+                  commentary: [commentary_text, ...commentary.slice(0, 49)],
+                  broadcastVersion: s.broadcastVersion + 1,
+                }));
+              } else {
+                const target = innings.runs + 1;
+                const battingTeam2 = innings.bowlingTeamId;
+                const bowlingTeam2 = innings.battingTeamId;
+                const secondInnings = createInnings(2, battingTeam2, bowlingTeam2, target);
+                const updatedInnings = [...match.innings.map((inn, i) => i === inningsIdx ? innings : inn), secondInnings];
+                set(s => ({
+                  matches: {
+                    ...s.matches,
+                    [activeMatchId]: {
+                      ...match,
+                      innings: updatedInnings,
+                      currentInningsIndex: 1,
+                      status: 'innings_break',
+                      updatedAt: Date.now(),
+                    },
+                  },
+                  commentary: [commentary_text, ...commentary.slice(0, 49)],
+                  broadcastVersion: s.broadcastVersion + 1,
+                }));
+              }
               broadcastState(get());
               return;
             }
