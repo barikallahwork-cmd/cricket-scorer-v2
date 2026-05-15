@@ -61,6 +61,7 @@ function recalcPoints(teams: TournamentTeam[], fixtures: Fixture[]): PointsEntry
 interface TournamentState {
   tournaments: Record<string, Tournament>;
   managedTeams: ManagedTeam[];
+  version: number;
 }
 interface TournamentActions {
   createTournament(data: { name: string; organizer: string; startDate: string; endDate: string; venue: string; format: TournamentFormat; description: string; oversPerInnings?: number }): string;
@@ -87,6 +88,7 @@ export const useTournamentStore = create<Store>()(
     (set, get) => ({
       tournaments: {},
       managedTeams: [],
+      version: 0,
 
       createTournament(data) {
         const id = generateId();
@@ -99,7 +101,7 @@ export const useTournamentStore = create<Store>()(
           status: 'upcoming',
           createdAt: Date.now(),
         };
-        set(s => ({ tournaments: { ...s.tournaments, [id]: tournament } }));
+        set(s => ({ tournaments: { ...s.tournaments, [id]: tournament }, version: s.version + 1 }));
         return id;
       },
 
@@ -107,7 +109,7 @@ export const useTournamentStore = create<Store>()(
         set(s => {
           const t = s.tournaments[tournamentId];
           if (!t) return s;
-          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, teams: [...t.teams, { ...team, id: generateId() }] } } };
+          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, teams: [...t.teams, { ...team, id: generateId() }] } }, version: s.version + 1 };
         });
       },
 
@@ -115,7 +117,7 @@ export const useTournamentStore = create<Store>()(
         set(s => {
           const t = s.tournaments[tournamentId];
           if (!t) return s;
-          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, teams: t.teams.filter(tm => tm.id !== teamId) } } };
+          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, teams: t.teams.filter(tm => tm.id !== teamId) } }, version: s.version + 1 };
         });
       },
 
@@ -124,7 +126,7 @@ export const useTournamentStore = create<Store>()(
           const t = s.tournaments[tournamentId];
           if (!t) return s;
           const newGround: Ground = { ...ground, id: generateId() };
-          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, grounds: [...(t.grounds ?? []), newGround] } } };
+          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, grounds: [...(t.grounds ?? []), newGround] } }, version: s.version + 1 };
         });
       },
 
@@ -132,7 +134,7 @@ export const useTournamentStore = create<Store>()(
         set(s => {
           const t = s.tournaments[tournamentId];
           if (!t) return s;
-          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, grounds: t.grounds.filter(g => g.id !== groundId) } } };
+          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, grounds: t.grounds.filter(g => g.id !== groundId) } }, version: s.version + 1 };
         });
       },
 
@@ -140,7 +142,7 @@ export const useTournamentStore = create<Store>()(
         set(s => {
           const t = s.tournaments[tournamentId];
           if (!t) return s;
-          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, fixtureMode: mode } } };
+          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, fixtureMode: mode } }, version: s.version + 1 };
         });
       },
 
@@ -151,7 +153,7 @@ export const useTournamentStore = create<Store>()(
         if (t.format === 'knockout') fixtures = generateKnockoutFixtures(tournamentId, t.teams);
         else if (t.format === 'league_knockout') fixtures = generateLeagueKnockoutFixtures(tournamentId, t.teams);
         else fixtures = generateRoundRobinFixtures(tournamentId, t.teams);
-        set(s => ({ tournaments: { ...s.tournaments, [tournamentId]: { ...t, fixtures, fixtureMode: 'auto', status: 'ongoing' } } }));
+        set(s => ({ tournaments: { ...s.tournaments, [tournamentId]: { ...t, fixtures, fixtureMode: 'auto', status: 'ongoing' } }, version: s.version + 1 }));
       },
 
       addCustomFixture(tournamentId, fixture) {
@@ -160,7 +162,7 @@ export const useTournamentStore = create<Store>()(
           if (!t) return s;
           const newFixture: Fixture = { ...fixture, id: generateId(), tournamentId };
           const fixtures = [...t.fixtures, newFixture];
-          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, fixtures, status: 'ongoing' } } };
+          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, fixtures, status: 'ongoing' } }, version: s.version + 1 };
         });
       },
 
@@ -170,7 +172,7 @@ export const useTournamentStore = create<Store>()(
           if (!t) return s;
           const fixtures = t.fixtures.filter(f => f.id !== fixtureId);
           const pointsTable = recalcPoints(t.teams, fixtures);
-          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, fixtures, pointsTable } } };
+          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, fixtures, pointsTable } }, version: s.version + 1 };
         });
       },
 
@@ -180,27 +182,27 @@ export const useTournamentStore = create<Store>()(
           if (!t) return s;
           const fixtures = t.fixtures.map(f => f.id === fixtureId ? { ...f, ...data } : f);
           const pointsTable = recalcPoints(t.teams, fixtures);
-          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, fixtures, pointsTable } } };
+          return { tournaments: { ...s.tournaments, [tournamentId]: { ...t, fixtures, pointsTable } }, version: s.version + 1 };
         });
       },
 
       deleteTournament(id) {
-        set(s => { const { [id]: _, ...rest } = s.tournaments; return { tournaments: rest }; });
+        set(s => { const { [id]: _, ...rest } = s.tournaments; return { tournaments: rest, version: s.version + 1 }; });
       },
 
       createManagedTeam(team) {
         const id = generateId();
         const newTeam: ManagedTeam = { ...team, id };
-        set(s => ({ managedTeams: [...s.managedTeams, newTeam] }));
+        set(s => ({ managedTeams: [...s.managedTeams, newTeam], version: s.version + 1 }));
         return id;
       },
 
       updateManagedTeam(id, data) {
-        set(s => ({ managedTeams: s.managedTeams.map(t => t.id === id ? { ...t, ...data } : t) }));
+        set(s => ({ managedTeams: s.managedTeams.map(t => t.id === id ? { ...t, ...data } : t), version: s.version + 1 }));
       },
 
       deleteManagedTeam(id) {
-        set(s => ({ managedTeams: s.managedTeams.filter(t => t.id !== id) }));
+        set(s => ({ managedTeams: s.managedTeams.filter(t => t.id !== id), version: s.version + 1 }));
       },
     }),
     { name: 'cricket-tournament-v1', storage: createJSONStorage(() => typeof window !== 'undefined' ? localStorage : { getItem: () => null, setItem: () => {}, removeItem: () => {} }) }

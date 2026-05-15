@@ -6,10 +6,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useMatchStore from '@/store/matchStore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, Plus, Play, Trash2, Calendar, MapPin, Users, X, Globe } from 'lucide-react';
+import { Activity, Plus, Play, Trash2, Calendar, MapPin, Users, X, Globe, LogOut } from 'lucide-react';
 import { Match } from '@/store/types';
 import { getMatchTitle } from '@/utils/formatting';
 import { resolveCode } from '@/hooks/useFirebaseSync';
+import { useAuth } from '@/contexts/AuthContext';
 
 function StatusBadge({ status }: { status: Match['status'] }) {
   const configs = {
@@ -33,6 +34,7 @@ export default function HomePage() {
   const router = useRouter();
   const { matches, activeMatchId, setActiveMatch, deleteMatch } = useMatchStore();
   const matchList = Object.values(matches).sort((a, b) => b.updatedAt - a.updatedAt);
+  const { user, logout } = useAuth();
   const [showJoin, setShowJoin] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [joining, setJoining] = useState(false);
@@ -104,6 +106,23 @@ export default function HomePage() {
               <Plus className="w-4 h-4" />
               <span className="hidden xs:inline sm:inline">New</span>
             </button>
+            {user && (
+              <div className="flex items-center gap-2 pl-2 border-l border-slate-700 ml-1">
+                <div className="w-7 h-7 rounded-full bg-green-700 flex items-center justify-center text-xs font-bold text-white overflow-hidden shrink-0">
+                  {user.photoURL
+                    ? <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
+                    : (user.displayName?.[0] ?? user.email?.[0] ?? '?').toUpperCase()
+                  }
+                </div>
+                <button
+                  onClick={logout}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-colors"
+                  title="Sign out"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </header>
