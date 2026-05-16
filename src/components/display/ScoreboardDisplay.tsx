@@ -260,13 +260,10 @@ function CommentaryTicker({ commentary }: { commentary: string[] }) {
 }
 
 export default function ScoreboardDisplay({ matchCode }: { matchCode?: string | null }) {
-  // Same-browser sync (BroadcastChannel + localStorage) — used when no matchCode
-  useBroadcastReceiver();
-
-  // RTDB live listener — used when matchCode is provided (separate screen / different device)
   const [remoteMatch, setRemoteMatch] = useState<Match | null>(null);
   const [remoteCommentary, setRemoteCommentary] = useState<string[]>([]);
 
+  // RTDB live listener — cross-device real-time updates
   useEffect(() => {
     if (!matchCode) return;
     const db = getFirebaseDB();
@@ -285,12 +282,61 @@ export default function ScoreboardDisplay({ matchCode }: { matchCode?: string | 
     return () => off(dbRef, 'value', handler);
   }, [matchCode]);
 
+  // BroadcastChannel + localStorage — same-browser instant updates
+  // When matchCode provided, pipe broadcast updates into local state too
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    function applyBroadcast(raw: unknown) {
+      if (!raw || typeof raw !== 'object') return;
+      const s = raw as any;
+      if (!matchCode) {
+        // No matchCode: update global store (original behaviour)
+        useMatchStore.setState({
+          matches: s.matches ?? {},
+          activeMatchId: s.activeMatchId ?? null,
+          commentary: s.commentary ?? [],
+          broadcastVersion: s.broadcastVersion ?? 0,
+        });
+        return;
+      }
+      // matchCode: update local state if this broadcast is for our match
+      const activeMatch = s.matches?.[s.activeMatchId];
+      if (activeMatch?.matchCode === matchCode) {
+        setRemoteMatch(activeMatch);
+        setRemoteCommentary(s.commentary ?? []);
+      }
+    }
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('cricket-scorer-v1');
+      channel.onmessage = (e) => {
+        if (e.data?.type === 'STATE_UPDATE') applyBroadcast(e.data.payload);
+      };
+    } catch {}
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key !== 'cricket-scorer-v2' || !e.newValue) return;
+      try {
+        const parsed = JSON.parse(e.newValue);
+        if (parsed?.state) applyBroadcast(parsed.state);
+      } catch {}
+    };
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      channel?.close();
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, [matchCode]);
+
   const [isFullscreen, setIsFullscreen] = useState(false);
   const storeMatches = useMatchStore(s => s.matches);
   const storeActiveId = useMatchStore(s => s.activeMatchId);
   const storeCommentary = useMatchStore(s => s.commentary);
 
-  // When matchCode provided: use RTDB data; otherwise use local store
+  // When matchCode provided: use RTDB/broadcast local state; otherwise use global store
   const match: Match | null = matchCode ? remoteMatch : (storeActiveId ? storeMatches[storeActiveId] : null);
   const commentary = matchCode ? remoteCommentary : storeCommentary;
 

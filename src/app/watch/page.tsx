@@ -138,7 +138,7 @@ export default function WatchPage() {
           <Shield className="w-3 h-3" />
           ADMIN · {matchCode}
         </div>
-        <ScoreboardDisplay />
+        <ScoreboardDisplay matchCode={matchCode} />
         <AdminControls matchCode={matchCode} />
       </div>
     );
@@ -151,7 +151,7 @@ export default function WatchPage() {
         <Wifi className="w-3 h-3" />
         LIVE · {matchCode}
       </div>
-      <ScoreboardDisplay />
+      <ScoreboardDisplay matchCode={matchCode} />
     </div>
   );
 }
