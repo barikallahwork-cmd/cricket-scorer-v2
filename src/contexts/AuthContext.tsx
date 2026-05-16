@@ -92,13 +92,22 @@ async function loadUserData(uid: string) {
 
     if (matchSnap.exists()) {
       const d = matchSnap.data();
-      useMatchStore.setState({ matches: d.matches ?? {}, activeMatchId: d.activeMatchId ?? null, commentary: d.commentary ?? [], broadcastVersion: d.broadcastVersion ?? 0 });
+      const incoming = d.broadcastVersion ?? 0;
+      const current = useMatchStore.getState().broadcastVersion;
+      // Only load from Firestore if it has equal-or-newer data (prevents overwriting unsync'd local state)
+      if (incoming >= current) {
+        useMatchStore.setState({ matches: d.matches ?? {}, activeMatchId: d.activeMatchId ?? null, commentary: d.commentary ?? [], broadcastVersion: incoming });
+      }
       matchesLoaded = true;
     }
 
     if (tournamentSnap.exists()) {
       const d = tournamentSnap.data();
-      useTournamentStore.setState({ tournaments: d.tournaments ?? {}, managedTeams: d.managedTeams ?? [], version: d.version ?? 0 });
+      const incoming = d.version ?? 0;
+      const current = useTournamentStore.getState().version;
+      if (incoming >= current) {
+        useTournamentStore.setState({ tournaments: d.tournaments ?? {}, managedTeams: d.managedTeams ?? [], version: incoming });
+      }
       tournamentsLoaded = true;
     }
 

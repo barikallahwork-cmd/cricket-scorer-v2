@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
 import { getFirebaseFirestore } from '@/lib/firebase';
 import useMatchStore from '@/store/matchStore';
@@ -26,26 +26,18 @@ async function syncTournaments(userId: string) {
 
 export function useMatchFirestoreSync(userId: string | null) {
   const broadcastVersion = useMatchStore(s => s.broadcastVersion);
-  const syncReady = useRef(false);
 
+  // Write to Firestore on every state change — no delay, no timing gaps
   useEffect(() => {
-    syncReady.current = false;
     if (!userId) return;
-    const t = setTimeout(() => { syncReady.current = true; }, 3000);
-    return () => clearTimeout(t);
-  }, [userId]);
-
-  // Sync immediately on every state change (after initial 3s delay)
-  useEffect(() => {
-    if (!userId || !syncReady.current) return;
     syncMatches(userId).catch(() => {});
   }, [broadcastVersion, userId]);
 
-  // Immediate sync when tab becomes hidden (covers browser close / tab switch)
+  // Sync when tab is hidden (browser close / tab switch away)
   useEffect(() => {
     if (!userId) return;
     const handleVisibility = () => {
-      if (document.visibilityState === 'hidden' && syncReady.current) {
+      if (document.visibilityState === 'hidden') {
         syncMatches(userId).catch(() => {});
       }
     };
@@ -56,24 +48,16 @@ export function useMatchFirestoreSync(userId: string | null) {
 
 export function useTournamentFirestoreSync(userId: string | null) {
   const version = useTournamentStore(s => s.version);
-  const syncReady = useRef(false);
 
   useEffect(() => {
-    syncReady.current = false;
     if (!userId) return;
-    const t = setTimeout(() => { syncReady.current = true; }, 3000);
-    return () => clearTimeout(t);
-  }, [userId]);
-
-  useEffect(() => {
-    if (!userId || !syncReady.current) return;
     syncTournaments(userId).catch(() => {});
   }, [version, userId]);
 
   useEffect(() => {
     if (!userId) return;
     const handleVisibility = () => {
-      if (document.visibilityState === 'hidden' && syncReady.current) {
+      if (document.visibilityState === 'hidden') {
         syncTournaments(userId).catch(() => {});
       }
     };
