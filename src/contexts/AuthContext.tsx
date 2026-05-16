@@ -6,6 +6,7 @@ import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { getFirebaseAuth, getFirebaseFirestore } from '@/lib/firebase';
 import useMatchStore from '@/store/matchStore';
 import useTournamentStore from '@/store/tournamentStore';
+import { suppressMatchWrite, suppressTournamentWrite } from '@/hooks/useFirestoreSync';
 
 interface AuthContextValue {
   user: User | null;
@@ -77,7 +78,9 @@ async function migrateLocalData(
   }
 }
 
-async function loadUserData(uid: string) {
+// forceLoad=true on login: bidirectional — download if Firestore is newer, upload if local is newer.
+// forceLoad=false on tab-visibility: download only if Firestore is newer (preserve live scoring).
+async function loadUserData(uid: string, forceLoad = false) {
   const db = getFirebaseFirestore();
   if (!db) { restoreFromBackup(uid); return; }
 
@@ -94,9 +97,18 @@ async function loadUserData(uid: string) {
       const d = matchSnap.data();
       const incoming = d.broadcastVersion ?? 0;
       const current = useMatchStore.getState().broadcastVersion;
-      // Only load from Firestore if it has equal-or-newer data (prevents overwriting unsync'd local state)
       if (incoming >= current) {
+        suppressMatchWrite(incoming);
         useMatchStore.setState({ matches: d.matches ?? {}, activeMatchId: d.activeMatchId ?? null, commentary: d.commentary ?? [], broadcastVersion: incoming });
+      } else if (forceLoad) {
+        // Local is newer — push to Firestore so other devices can see it
+        const s = useMatchStore.getState();
+        try {
+          await setDoc(doc(db, 'users', uid, 'data', 'matches'), {
+            matches: s.matches, activeMatchId: s.activeMatchId ?? null,
+            commentary: s.commentary, broadcastVersion: s.broadcastVersion, updatedAt: Date.now(),
+          });
+        } catch {}
       }
       matchesLoaded = true;
     }
@@ -106,7 +118,16 @@ async function loadUserData(uid: string) {
       const incoming = d.version ?? 0;
       const current = useTournamentStore.getState().version;
       if (incoming >= current) {
+        suppressTournamentWrite(incoming);
         useTournamentStore.setState({ tournaments: d.tournaments ?? {}, managedTeams: d.managedTeams ?? [], version: incoming });
+      } else if (forceLoad) {
+        // Local is newer — push to Firestore so other devices can see it
+        const s = useTournamentStore.getState();
+        try {
+          await setDoc(doc(db, 'users', uid, 'data', 'tournaments'), {
+            tournaments: s.tournaments, managedTeams: s.managedTeams ?? [], version: s.version, updatedAt: Date.now(),
+          });
+        } catch {}
       }
       tournamentsLoaded = true;
     }
@@ -136,6 +157,7 @@ function subscribeUserData(uid: string): () => void {
       const incoming = data.broadcastVersion ?? 0;
       const current = useMatchStore.getState().broadcastVersion;
       if (incoming > current) {
+        suppressMatchWrite(incoming);
         useMatchStore.setState({ matches: data.matches ?? {}, activeMatchId: data.activeMatchId ?? null, commentary: data.commentary ?? [], broadcastVersion: incoming });
       }
     },
@@ -150,6 +172,7 @@ function subscribeUserData(uid: string): () => void {
       const incoming = data.version ?? 0;
       const current = useTournamentStore.getState().version;
       if (incoming > current) {
+        suppressTournamentWrite(incoming);
         useTournamentStore.setState({ tournaments: data.tournaments ?? {}, managedTeams: data.managedTeams ?? [], version: incoming });
       }
     },
@@ -171,9 +194,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) {
+        const isNewSession = uidRef.current !== u.uid;
         uidRef.current = u.uid;
-        await loadUserData(u.uid);
-        firestoreUnsubRef.current = subscribeUserData(u.uid);
+        if (isNewSession) {
+          firestoreUnsubRef.current?.();
+          await loadUserData(u.uid, true);
+          firestoreUnsubRef.current = subscribeUserData(u.uid);
+        }
         setUser(u);
       } else {
         firestoreUnsubRef.current?.();
