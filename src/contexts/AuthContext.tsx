@@ -21,20 +21,6 @@ const AuthContext = createContext<AuthContextValue>({
 
 function backupKey(uid: string) { return `cricket-backup-${uid}`; }
 
-function saveBackup(uid: string) {
-  try {
-    const m = useMatchStore.getState();
-    const t = useTournamentStore.getState();
-    if (Object.keys(m.matches).length === 0 && Object.keys(t.tournaments).length === 0) return;
-    localStorage.setItem(backupKey(uid), JSON.stringify({
-      matches: m.matches, activeMatchId: m.activeMatchId,
-      commentary: m.commentary, broadcastVersion: m.broadcastVersion,
-      tournaments: t.tournaments, managedTeams: t.managedTeams,
-      version: t.version, savedAt: Date.now(),
-    }));
-  } catch {}
-}
-
 function restoreFromBackup(uid: string) {
   try {
     const raw = localStorage.getItem(backupKey(uid));
@@ -54,28 +40,43 @@ function restoreFromBackup(uid: string) {
   } catch {}
 }
 
-async function migrateLocalData(uid: string, db: NonNullable<ReturnType<typeof getFirebaseFirestore>>) {
+async function migrateLocalData(
+  uid: string,
+  db: ReturnType<typeof getFirebaseFirestore>,
+  migrateMatches: boolean,
+  migrateTournaments: boolean,
+) {
+  if (!db) return;
+
   const sources = [
     () => { try { const r = localStorage.getItem(backupKey(uid)); return r ? JSON.parse(r) : null; } catch { return null; } },
     () => { try { const r = localStorage.getItem('cricket-scorer-v2'); const s = r ? JSON.parse(r) : null; return s?.state ?? null; } catch { return null; } },
   ];
 
-  for (const getSrc of sources) {
-    const src = getSrc();
+  for (const getSource of sources) {
+    const src = getSource();
     if (!src) continue;
-    if (Object.keys(src.matches ?? {}).length > 0) {
+
+    if (migrateMatches && Object.keys(src.matches ?? {}).length > 0) {
       useMatchStore.setState({ matches: src.matches, activeMatchId: src.activeMatchId ?? null, commentary: src.commentary ?? [], broadcastVersion: src.broadcastVersion ?? 0 });
-      try { await setDoc(doc(db, 'users', uid, 'data', 'matches'), { matches: src.matches, activeMatchId: src.activeMatchId ?? null, commentary: src.commentary ?? [], broadcastVersion: src.broadcastVersion ?? 0, updatedAt: Date.now() }); } catch {}
+      try {
+        await setDoc(doc(db, 'users', uid, 'data', 'matches'), { matches: src.matches, activeMatchId: src.activeMatchId ?? null, commentary: src.commentary ?? [], broadcastVersion: src.broadcastVersion ?? 0, updatedAt: Date.now() });
+        migrateMatches = false;
+      } catch {}
     }
-    if (Object.keys(src.tournaments ?? {}).length > 0) {
+
+    if (migrateTournaments && Object.keys(src.tournaments ?? {}).length > 0) {
       useTournamentStore.setState({ tournaments: src.tournaments, managedTeams: src.managedTeams ?? [], version: src.version ?? 0 });
-      try { await setDoc(doc(db, 'users', uid, 'data', 'tournaments'), { tournaments: src.tournaments, managedTeams: src.managedTeams ?? [], version: src.version ?? 0, updatedAt: Date.now() }); } catch {}
+      try {
+        await setDoc(doc(db, 'users', uid, 'data', 'tournaments'), { tournaments: src.tournaments, managedTeams: src.managedTeams ?? [], version: src.version ?? 0, updatedAt: Date.now() });
+        migrateTournaments = false;
+      } catch {}
     }
-    break;
+
+    if (!migrateMatches && !migrateTournaments) break;
   }
 }
 
-// Initial one-time load from Firestore on login
 async function loadUserData(uid: string) {
   const db = getFirebaseFirestore();
   if (!db) { restoreFromBackup(uid); return; }
@@ -86,29 +87,34 @@ async function loadUserData(uid: string) {
       getDoc(doc(db, 'users', uid, 'data', 'tournaments')),
     ]);
 
-    let needMigration = false;
+    let matchesLoaded = false;
+    let tournamentsLoaded = false;
 
     if (matchSnap.exists()) {
       const d = matchSnap.data();
       useMatchStore.setState({ matches: d.matches ?? {}, activeMatchId: d.activeMatchId ?? null, commentary: d.commentary ?? [], broadcastVersion: d.broadcastVersion ?? 0 });
-      try { localStorage.removeItem(backupKey(uid)); } catch {}
-    } else {
-      needMigration = true;
+      matchesLoaded = true;
     }
 
     if (tournamentSnap.exists()) {
       const d = tournamentSnap.data();
       useTournamentStore.setState({ tournaments: d.tournaments ?? {}, managedTeams: d.managedTeams ?? [], version: d.version ?? 0 });
+      tournamentsLoaded = true;
     }
 
-    if (needMigration) await migrateLocalData(uid, db);
+    if (!matchesLoaded || !tournamentsLoaded) {
+      await migrateLocalData(uid, db, !matchesLoaded, !tournamentsLoaded);
+    }
+
+    if (matchesLoaded) {
+      try { localStorage.removeItem(backupKey(uid)); } catch {}
+    }
   } catch {
     restoreFromBackup(uid);
   }
 }
 
-// Real-time Firestore listener — fires on every change from any device
-// Version check prevents write-back loops: only apply if incoming version > local version
+// Real-time listener — only applies update if incoming version is strictly newer (prevents write-back loops)
 function subscribeUserData(uid: string): () => void {
   const db = getFirebaseFirestore();
   if (!db) return () => {};
@@ -121,15 +127,10 @@ function subscribeUserData(uid: string): () => void {
       const incoming = data.broadcastVersion ?? 0;
       const current = useMatchStore.getState().broadcastVersion;
       if (incoming > current) {
-        useMatchStore.setState({
-          matches: data.matches ?? {},
-          activeMatchId: data.activeMatchId ?? null,
-          commentary: data.commentary ?? [],
-          broadcastVersion: incoming,
-        });
+        useMatchStore.setState({ matches: data.matches ?? {}, activeMatchId: data.activeMatchId ?? null, commentary: data.commentary ?? [], broadcastVersion: incoming });
       }
     },
-    () => {}, // silent error
+    () => {},
   );
 
   const unsubTournaments = onSnapshot(
@@ -140,11 +141,7 @@ function subscribeUserData(uid: string): () => void {
       const incoming = data.version ?? 0;
       const current = useTournamentStore.getState().version;
       if (incoming > current) {
-        useTournamentStore.setState({
-          tournaments: data.tournaments ?? {},
-          managedTeams: data.managedTeams ?? [],
-          version: incoming,
-        });
+        useTournamentStore.setState({ tournaments: data.tournaments ?? {}, managedTeams: data.managedTeams ?? [], version: incoming });
       }
     },
     () => {},
@@ -167,11 +164,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (u) {
         uidRef.current = u.uid;
         await loadUserData(u.uid);
-        // Start real-time listener after initial load
         firestoreUnsubRef.current = subscribeUserData(u.uid);
         setUser(u);
       } else {
-        // Unsubscribe real-time listener on logout
         firestoreUnsubRef.current?.();
         firestoreUnsubRef.current = null;
         uidRef.current = null;
@@ -183,11 +178,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return unsub;
   }, []);
 
+  // Re-fetch from Firestore when tab becomes visible (handles cases where onSnapshot missed updates)
+  useEffect(() => {
+    if (!user) return;
+    const uid = user.uid;
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadUserData(uid).catch(() => {});
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [user]);
+
   const logout = useCallback(async () => {
     const auth = getFirebaseAuth();
     if (!auth) return;
 
-    // Write current state to Firestore before signing out
     const db = getFirebaseFirestore();
     if (db && user) {
       const uid = user.uid;
