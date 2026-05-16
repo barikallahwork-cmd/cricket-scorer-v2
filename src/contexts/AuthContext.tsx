@@ -205,9 +205,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await loadUserData(u.uid);
         setUser(u);
       } else {
-        // Save UID-tagged backup before Zustand persist overwrites localStorage
-        if (uidRef.current) saveBackup(uidRef.current);
-        clearStores();
+        // Do NOT clear stores — data stays in localStorage as fallback.
+        // loadUserData() on next login will load fresh Firestore data and overwrite it.
+        // AuthGuard shows a spinner until then so stale data is never visible.
         uidRef.current = null;
         setUser(null);
       }
