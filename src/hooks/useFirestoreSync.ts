@@ -19,22 +19,36 @@ export function suppressTournamentWrite(version: number) {
   _suppressTournamentWriteForVersion = version;
 }
 
-async function syncMatches(userId: string) {
+async function syncMatches(userId: string, attempt = 0): Promise<void> {
   const db = getFirebaseFirestore();
   if (!db) return;
   const { matches, activeMatchId, commentary, broadcastVersion } = useMatchStore.getState();
-  await setDoc(doc(db, 'users', userId, 'data', 'matches'), {
-    matches, activeMatchId, commentary, broadcastVersion, updatedAt: Date.now(),
-  });
+  try {
+    await setDoc(doc(db, 'users', userId, 'data', 'matches'), {
+      matches, activeMatchId, commentary, broadcastVersion, updatedAt: Date.now(),
+    });
+  } catch {
+    if (attempt < 2) {
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+      return syncMatches(userId, attempt + 1);
+    }
+  }
 }
 
-async function syncTournaments(userId: string) {
+async function syncTournaments(userId: string, attempt = 0): Promise<void> {
   const db = getFirebaseFirestore();
   if (!db) return;
   const { tournaments, managedTeams, version } = useTournamentStore.getState();
-  await setDoc(doc(db, 'users', userId, 'data', 'tournaments'), {
-    tournaments, managedTeams, version, updatedAt: Date.now(),
-  });
+  try {
+    await setDoc(doc(db, 'users', userId, 'data', 'tournaments'), {
+      tournaments, managedTeams, version, updatedAt: Date.now(),
+    });
+  } catch {
+    if (attempt < 2) {
+      await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+      return syncTournaments(userId, attempt + 1);
+    }
+  }
 }
 
 export function useMatchFirestoreSync(userId: string | null) {

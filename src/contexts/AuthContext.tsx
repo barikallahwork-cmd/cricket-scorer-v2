@@ -144,42 +144,71 @@ async function loadUserData(uid: string, forceLoad = false) {
   }
 }
 
-// Real-time listener — only applies update if incoming version is strictly newer (prevents write-back loops)
+// Real-time listener — only applies update if incoming version is strictly newer (prevents write-back loops).
+// Re-subscribes on error with exponential backoff so a dropped WebSocket doesn't silently kill sync.
 function subscribeUserData(uid: string): () => void {
   const db = getFirebaseFirestore();
   if (!db) return () => {};
 
-  const unsubMatches = onSnapshot(
-    doc(db, 'users', uid, 'data', 'matches'),
-    (snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
-      const incoming = data.broadcastVersion ?? 0;
-      const current = useMatchStore.getState().broadcastVersion;
-      if (incoming > current) {
-        suppressMatchWrite(incoming);
-        useMatchStore.setState({ matches: data.matches ?? {}, activeMatchId: data.activeMatchId ?? null, commentary: data.commentary ?? [], broadcastVersion: incoming });
-      }
-    },
-    () => {},
-  );
+  let cancelled = false;
+  let unsubMatches: (() => void) | null = null;
+  let unsubTournaments: (() => void) | null = null;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let retryDelay = 2000;
 
-  const unsubTournaments = onSnapshot(
-    doc(db, 'users', uid, 'data', 'tournaments'),
-    (snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
-      const incoming = data.version ?? 0;
-      const current = useTournamentStore.getState().version;
-      if (incoming > current) {
-        suppressTournamentWrite(incoming);
-        useTournamentStore.setState({ tournaments: data.tournaments ?? {}, managedTeams: data.managedTeams ?? [], version: incoming });
-      }
-    },
-    () => {},
-  );
+  function subscribeMatches() {
+    if (cancelled) return;
+    unsubMatches?.();
+    unsubMatches = onSnapshot(
+      doc(db!, 'users', uid, 'data', 'matches'),
+      (snap) => {
+        retryDelay = 2000; // reset backoff on successful delivery
+        if (!snap.exists()) return;
+        const data = snap.data();
+        const incoming = data.broadcastVersion ?? 0;
+        const current = useMatchStore.getState().broadcastVersion;
+        if (incoming > current) {
+          suppressMatchWrite(incoming);
+          useMatchStore.setState({ matches: data.matches ?? {}, activeMatchId: data.activeMatchId ?? null, commentary: data.commentary ?? [], broadcastVersion: incoming });
+        }
+      },
+      () => {
+        if (!cancelled) {
+          retryTimer = setTimeout(() => { subscribeMatches(); subscribeTournaments(); }, retryDelay);
+          retryDelay = Math.min(retryDelay * 2, 30000);
+        }
+      },
+    );
+  }
 
-  return () => { unsubMatches(); unsubTournaments(); };
+  function subscribeTournaments() {
+    if (cancelled) return;
+    unsubTournaments?.();
+    unsubTournaments = onSnapshot(
+      doc(db!, 'users', uid, 'data', 'tournaments'),
+      (snap) => {
+        if (!snap.exists()) return;
+        const data = snap.data();
+        const incoming = data.version ?? 0;
+        const current = useTournamentStore.getState().version;
+        if (incoming > current) {
+          suppressTournamentWrite(incoming);
+          useTournamentStore.setState({ tournaments: data.tournaments ?? {}, managedTeams: data.managedTeams ?? [], version: incoming });
+        }
+      },
+      () => {}, // matches listener handles the retry for both
+    );
+  }
+
+  subscribeMatches();
+  subscribeTournaments();
+
+  return () => {
+    cancelled = true;
+    if (retryTimer) clearTimeout(retryTimer);
+    unsubMatches?.();
+    unsubTournaments?.();
+  };
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -226,6 +255,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [user]);
+
 
   const logout = useCallback(async () => {
     const auth = getFirebaseAuth();
